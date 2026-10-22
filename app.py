@@ -1,3 +1,4 @@
+import calendar
 import datetime
 from datetime import date
 import streamlit as st
@@ -86,6 +87,45 @@ DIZHI = [
     "戌",
     "亥",
 ]
+LUNAR_DAY_CN = [
+    "初一",
+    "初二",
+    "初三",
+    "初四",
+    "初五",
+    "初六",
+    "初七",
+    "初八",
+    "初九",
+    "初十",
+    "十一",
+    "十二",
+    "十三",
+    "十四",
+    "十五",
+    "十六",
+    "十七",
+    "十八",
+    "十九",
+    "二十",
+    "廿一",
+    "廿二",
+    "廿三",
+    "廿四",
+    "廿五",
+    "廿六",
+    "廿七",
+    "廿八",
+    "廿九",
+    "三十",
+]
+MIN_DATE = date(1911, 1, 1)
+
+
+def get_lunar_day_label(lunar_day):
+  if not 1 <= lunar_day <= len(LUNAR_DAY_CN):
+    raise ValueError(f"Unsupported lunar day: {lunar_day}")
+  return LUNAR_DAY_CN[lunar_day - 1]
 
 
 def get_shichen(hour):
@@ -182,20 +222,94 @@ if app_mode == "一、 萬年曆與個人提醒":
 
   with tab1:
     st.subheader("1. 國曆 / 農曆 / 生辰時辰轉換")
-    col1, col2 = st.columns(2)
+    today = date.today()
+    if "selected_solar_date" not in st.session_state:
+      st.session_state.selected_solar_date = today
+      st.session_state.calendar_year = today.year
+      st.session_state.calendar_month = today.month
 
-    with col1:
-      selected_date = st.date_input(
-          "選擇查詢日期（國曆）", value=date.today()
+    selected_date = st.session_state.selected_solar_date
+    st.markdown(
+        f"<h2 style='text-align:center; margin-bottom:0.5rem'>"
+        f"{selected_date:%Y年%m月%d日}</h2>",
+        unsafe_allow_html=True,
+    )
+
+    year_col, month_col = st.columns([2, 1])
+    with year_col:
+      calendar_year = st.selectbox(
+          "選擇年份",
+          options=list(range(1911, today.year + 1)),
+          key="calendar_year",
+          label_visibility="collapsed",
+      )
+    with month_col:
+      available_months = (
+          list(range(1, today.month + 1))
+          if calendar_year == today.year
+          else list(range(1, 13))
+      )
+      if st.session_state.calendar_month not in available_months:
+        st.session_state.calendar_month = available_months[-1]
+      calendar_month = st.selectbox(
+          "選擇月份",
+          options=available_months,
+          format_func=lambda month: f"{month}月",
+          key="calendar_month",
+          label_visibility="collapsed",
       )
 
-    with col2:
-      has_birth_time = st.checkbox("是否加入生辰時辰換算？")
-      birth_hour = 12
-      if has_birth_time:
-        birth_hour = st.slider(
-            "選擇出生小時 (24小時制)", 0, 23, 12, format="%d點"
+    weekdays = st.columns(7)
+    for column, weekday in zip(
+        weekdays, ["日", "一", "二", "三", "四", "五", "六"]
+    ):
+      column.markdown(
+          f"<div style='text-align:center;font-weight:bold'>{weekday}</div>",
+          unsafe_allow_html=True,
+      )
+
+    month_weeks = calendar.Calendar(firstweekday=calendar.SUNDAY).monthdayscalendar(
+        calendar_year, calendar_month
+    )
+    for week in month_weeks:
+      day_columns = st.columns(7)
+      for column, day in zip(day_columns, week):
+        if day == 0:
+          continue
+        solar_date = date(calendar_year, calendar_month, day)
+        lunar_day_label = get_lunar_day_label(
+            sxtwl.fromSolar(
+                solar_date.year, solar_date.month, solar_date.day
+            ).getLunarDay()
         )
+        with column:
+          if st.button(
+              str(day),
+              key=f"calendar-day-{calendar_year}-{calendar_month}-{day}",
+              type="primary" if solar_date == selected_date else "secondary",
+              disabled=solar_date > today,
+              use_container_width=True,
+          ):
+            st.session_state.selected_solar_date = solar_date
+            st.rerun()
+          st.markdown(
+              f"<div style='text-align:center;font-size:0.75rem;margin-top:-0.6rem'>"
+              f"{lunar_day_label}</div>",
+              unsafe_allow_html=True,
+          )
+
+    has_birth_time = st.checkbox("是否加入生辰時辰換算？")
+    birth_hour = 12
+    if has_birth_time:
+      birth_hour = st.number_input(
+          "輸入出生小時（24小時制）",
+          min_value=0,
+          max_value=23,
+          value=12,
+          step=1,
+          format="%d",
+          help="請輸入 0 至 23，例如下午 3 點請輸入 15。",
+      )
 
     # 利用 sxtwl 庫進行曆法計算
     try:
@@ -221,45 +335,12 @@ if app_mode == "一、 萬年曆與個人提醒":
           "冬",
           "臘",
       ]
-      day_cn = [
-          "初一",
-          "初二",
-          "初三",
-          "初四",
-          "初五",
-          "初六",
-          "初七",
-          "初八",
-          "初九",
-          "初十",
-          "十一",
-          "十二",
-          "十三",
-          "十四",
-          "十五",
-          "十六",
-          "十七",
-          "十八",
-          "十九",
-          "二十",
-          "廿一",
-          "廿二",
-          "廿三",
-          "廿四",
-          "廿五",
-          "廿六",
-          "廿七",
-          "廿八",
-          "廿九",
-          "三十",
-      ]
-
       m_str = (
           f"閏{month_cn[abs(lunar_month)-1]}月"
           if lunar_month < 0
           else f"{month_cn[lunar_month-1]}月"
       )
-      d_str = day_cn[lunar_day - 1] if 0 <= lunar_day < 30 else "初一"
+      d_str = get_lunar_day_label(lunar_day)
       lunar_str = f"農曆 {lunar_year}年 {m_str}{d_str}"
 
       # 天干地支 (年月日干支)
@@ -326,7 +407,9 @@ if app_mode == "一、 萬年曆與個人提醒":
     st.markdown("### ➕ 新增您的個人自訂活動與提醒")
     with st.form("custom_event_form"):
       c_name = st.text_input("活動名稱", placeholder="例如：點光明燈 / 個人還願")
-      c_date = st.date_input("活動日期", value=date.today())
+      c_date = st.date_input(
+          "活動日期", value=date.today(), min_value=MIN_DATE
+      )
       c_desc = st.text_area("備註事項", placeholder="輸入想提醒自己的內容...")
       submitted = st.form_submit_button("產生個人日曆提醒檔")
 
