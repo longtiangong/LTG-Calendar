@@ -227,7 +227,19 @@ def generate_ics(
       else reminder_days or []
   )
   for days in reminder_days_list:
-    trigger = f"-P{days}D" if days else "PT0M"
+    if days == 0:
+      # *6 全天活動的當日提醒設定於上午 9:30。
+      trigger = "PT9H30M" if event_time is None else "PT0M"
+    elif event_time is None:
+      # 7 全天活動以午夜開始；提前 14 小時 30 分即為指定日期上午 9:30。
+      adjusted_days = days - 1
+      trigger = (
+          f"-P{adjusted_days}DT14H30M"
+          if adjusted_days
+          else "-PT14H30M"
+      )
+    else:
+      trigger = f"-P{days}D"
     reminder_label = f"活動前 {days} 天" if days else "活動當日"
     event_lines.extend(
         [
@@ -811,17 +823,17 @@ if app_mode == "一、 萬年曆與個人提醒":
         "年度活動提醒時間",
         options=[14, 7, 1, 0],
         format_func=lambda days: {
-            14: "活動前 2 週",
-            7: "活動前 1 週",
-            1: "活動前 1 天",
-            0: "活動當日",
+            14: "活動前 2 週（上午 9:30）",
+            7: "活動前 1 週（上午 9:30）",
+            1: "活動前 1 天（上午 9:30）",
+            0: "活動當日（上午 9:30）",
         }[days],
         default=[14, 0],
         key="annual_reminder_days",
     )
     st.caption(
-        "可複選；選項會各自寫入 .ics，但匯入後是否都保留，仍須在 Google 日曆檢查。"
-        "如需確保多組提醒，需使用 Google Calendar API 同步。"
+        "可複選；提前提醒會在所選日期上午 9:30，活動當日提醒也會在上午 9:30。"
+        "Google 日曆匯入時可能套用日曆預設通知，匯入後請檢查通知設定。"
     )
     annual_events_ics = generate_annual_events_ics(
         LONGTIAN_EVENTS, annual_reminder_days
