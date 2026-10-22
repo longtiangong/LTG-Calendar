@@ -1,6 +1,7 @@
 import calendar
 import datetime
 import html  #! 新增：安全輸出月曆活動名稱
+import uuid
 from datetime import date
 import streamlit as st
 import sxtwl  # 用於農曆與天干地支計算
@@ -161,20 +162,145 @@ def get_shichen(hour):
     return "亥時 (21:00 - 23:00)"
 
 
-def generate_ics(event_name, event_date, description, url):
-  """產生 Google 日曆匯入用的 .ics 檔案內容"""
-  d_str = event_date.strftime("%Y%m%d")
-  ics_content = f"""BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//LongTianGong//Calendar//ZH
-BEGIN:VEVENT
-SUMMARY:{event_name}
-DESCRIPTION:{description}\\n報名連結: {url}
-DTSTART;VALUE=DATE:{d_str}
-DTEND;VALUE=DATE:{d_str}
-END:VEVENT
-END:VCALENDAR"""
-  return ics_content
+def escape_ics_text(value):
+  """Escape text values according to the iCalendar text format."""
+  return (
+      str(value)
+      .replace("\\", "\\\\")
+      .replace("\r\n", "\n")
+      .replace("\r", "\n")
+      .replace("\n", "\\n")
+      .replace(",", "\\,")
+      .replace(";", "\\;")
+  )
+
+
+def generate_ics(
+    event_name,
+    event_date,
+    description,
+    url,
+    event_time=None,
+    reminder_days=14,
+    event_end_date=None,
+):
+  """產生含日曆提醒的 Google 日曆匯入用 .ics 檔案內容。"""
+  uid = uuid.uuid5(
+      uuid.NAMESPACE_URL,
+      f"longtiangong:{event_name}:{event_date}:{event_time or 'all-day'}",
+  )
+  stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+  event_lines = [
+      "BEGIN:VEVENT",
+      f"UID:{uid}@longtiangong.calendar",
+      f"DTSTAMP:{stamp}",
+      f"SUMMARY:{escape_ics_text(event_name)}",
+      f"DESCRIPTION:{escape_ics_text(description)}"
+      + (
+          f"\\n報名連結: {escape_ics_text(url)}"
+          if url
+          else ""
+      ),
+  ]
+
+  if event_time is None:
+    end_date = event_end_date or event_date
+    event_lines.extend(
+        [
+            f"DTSTART;VALUE=DATE:{event_date:%Y%m%d}",
+            f"DTEND;VALUE=DATE:{end_date + datetime.timedelta(days=1):%Y%m%d}",
+        ]
+    )
+  else:
+    start_datetime = datetime.datetime.combine(event_date, event_time)
+    end_datetime = start_datetime + datetime.timedelta(hours=1)
+    event_lines.extend(
+        [
+            f"DTSTART:{start_datetime:%Y%m%dT%H%M%S}",
+            f"DTEND:{end_datetime:%Y%m%dT%H%M%S}",
+        ]
+    )
+
+  if reminder_days is not None:
+    trigger = f"-P{reminder_days}D" if reminder_days else "PT0M"
+    event_lines.extend(
+        [
+            "BEGIN:VALARM",
+            f"TRIGGER:{trigger}",
+            "ACTION:DISPLAY",
+            f"DESCRIPTION:{escape_ics_text(event_name)}",
+            "END:VALARM",
+        ]
+    )
+  event_lines.append("END:VEVENT")
+  return "\r\n".join(
+      [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//LongTianGong//Calendar//ZH",
+          *event_lines,
+          "END:VCALENDAR",
+          "",
+      ]
+  )
+
+
+def generate_lunar_monthly_ics(year, reminder_time):
+  """產生指定國曆年度農曆初一、十五的提醒日曆。"""
+  event_components = []
+  month_cn = [
+      "正",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六",
+      "七",
+      "八",
+      "九",
+      "十",
+      "冬",
+      "臘",
+  ]
+
+  current_date = date(year, 1, 1)
+  final_date = date(year, 12, 31)
+  while current_date <= final_date:
+    lunar_day_obj = sxtwl.fromSolar(
+        current_date.year, current_date.month, current_date.day
+    )
+    lunar_day = lunar_day_obj.getLunarDay()
+    if lunar_day in (1, 15):
+      lunar_month_value = lunar_day_obj.getLunarMonth()
+      lunar_month = abs(lunar_month_value)
+      day_label = "初一" if lunar_day == 1 else "十五"
+      event_name = (
+          f"龍天宮農曆{'閏' if lunar_month_value < 0 else ''}"
+          f"{month_cn[lunar_month - 1]}月{day_label}參拜提醒"
+      )
+      single_event_ics = generate_ics(
+          event_name,
+          current_date,
+          "農曆初一、十五敬香祈福提醒。",
+          "",
+          event_time=reminder_time,
+          reminder_days=0,
+      )
+      event_lines = single_event_ics.splitlines()
+      event_start = event_lines.index("BEGIN:VEVENT")
+      event_end = event_lines.index("END:VEVENT", event_start)
+      event_components.append(event_lines[event_start:event_end + 1])
+    current_date += datetime.timedelta(days=1)
+
+  calendar_lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//LongTianGong//Calendar//ZH",
+  ]
+  for event_lines in event_components:
+    calendar_lines.extend(event_lines)
+  calendar_lines.extend(["END:VCALENDAR", ""])
+  return "\r\n".join(calendar_lines)
 
 
 def get_ganzhi(day_obj, target):
@@ -235,6 +361,7 @@ if app_mode == "一、 萬年曆與個人提醒":
     st.session_state.setdefault("calendar_month", selected_date.month)
     # 2 保存手機月曆與結果文字的縮放倍率
     st.session_state.setdefault("calendar_text_zoom", 1.0)
+    # 3 跑馬燈提醒：選中宮中活動時，於月曆正下方顯示
 
     date_heading, today_button = st.columns([4, 1])
     with date_heading:
@@ -247,75 +374,58 @@ if app_mode == "一、 萬年曆與個人提醒":
       if st.button("📅 回到今天", use_container_width=True):
         st.session_state.selected_solar_date = today
         st.session_state.calendar_year = today.year
-        st.session_state.calendar_year_group = (
-            "1911–2000" if today.year <= 2000 else "2001–2066"
-        )
         st.session_state.calendar_month = today.month
         st.rerun()
 
-    # 2 年份分組選擇，縮短年份選單並快速切換歷史/未來區間
-    st.session_state.setdefault(
-        "calendar_year_group",
-        "1911–2000" if st.session_state.calendar_year <= 2000 else "2001–2066",
-    )
-    year_group_col, year_col, month_col = st.columns([1.2, 1, 1])
-    with year_group_col:
-      calendar_year_group = st.selectbox(
-          "年份範圍",
-          options=["1911–2000", "2001–2066"],
-          key="calendar_year_group",
-          label_visibility="collapsed",
-      )
-    year_options = (
-        list(range(1911, 2001))
-        if calendar_year_group == "1911–2000"
-        else list(range(2001, 2067))
-    )
-    if st.session_state.calendar_year not in year_options:
-      st.session_state.calendar_year = year_options[0]
-    with year_col:
-      calendar_year = st.selectbox(
-          "選擇年份",
-          options=year_options,
-          key="calendar_year",
-          label_visibility="collapsed",
-      )
-    with month_col:
-      available_months = list(range(1, 13))
-      if st.session_state.calendar_month not in available_months:
-        st.session_state.calendar_month = available_months[-1]
-      calendar_month = st.selectbox(
-          "選擇月份",
-          options=available_months,
-          format_func=lambda month: f"{month}月",
-          key="calendar_month",
-          label_visibility="collapsed",
-      )
+    with st.container(key="calendar_controls"):
+      # 3 直接輸入年份，避免長下拉清單佔版面且難以快速定位
+      year_col, month_col = st.columns([1, 1])
+      with year_col:
+        calendar_year = st.number_input(
+            "選擇年份",
+            min_value=1911,
+            max_value=2066,
+            step=1,
+            format="%d",
+            key="calendar_year",
+            label_visibility="collapsed",
+        )
+      with month_col:
+        available_months = list(range(1, 13))
+        if st.session_state.calendar_month not in available_months:
+          st.session_state.calendar_month = available_months[-1]
+        calendar_month = st.selectbox(
+            "選擇月份",
+            options=available_months,
+            format_func=lambda month: f"{month}月",
+            key="calendar_month",
+            label_visibility="collapsed",
+        )
 
-    # 2 手機字體縮放：提供不依賴瀏覽器手勢的放大/縮小按鈕
-    zoom_out_col, zoom_in_col = st.columns([1, 1])
-    with zoom_out_col:
-      if st.button(
-          "A−",
-          key="calendar_zoom_out",
-          use_container_width=True,
-          disabled=st.session_state.calendar_text_zoom <= 0.7,
-      ):
-        st.session_state.calendar_text_zoom = max(
-            0.7, round(st.session_state.calendar_text_zoom - 0.2, 1)
-        )
-    with zoom_in_col:
-      if st.button(
-          "A+",
-          key="calendar_zoom_in",
-          use_container_width=True,
-          disabled=st.session_state.calendar_text_zoom >= 1.8,
-      ):
-        st.session_state.calendar_text_zoom = min(
-            1.8, round(st.session_state.calendar_text_zoom + 0.2, 1)
-        )
-    calendar_text_zoom = st.session_state.calendar_text_zoom
-    st.caption(f"文字大小：{round(calendar_text_zoom * 100)}%")
+      # 2 手機字體縮放：提供不依賴瀏覽器手勢的放大/縮小按鈕
+      zoom_out_col, zoom_in_col = st.columns([1, 1])
+      with zoom_out_col:
+        if st.button(
+            "A−",
+            key="calendar_zoom_out",
+            use_container_width=True,
+            disabled=st.session_state.calendar_text_zoom <= 0.7,
+        ):
+          st.session_state.calendar_text_zoom = max(
+              0.7, round(st.session_state.calendar_text_zoom - 0.2, 1)
+          )
+      with zoom_in_col:
+        if st.button(
+            "A+",
+            key="calendar_zoom_in",
+            use_container_width=True,
+            disabled=st.session_state.calendar_text_zoom >= 1.8,
+        ):
+          st.session_state.calendar_text_zoom = min(
+              1.8, round(st.session_state.calendar_text_zoom + 0.2, 1)
+          )
+      calendar_text_zoom = st.session_state.calendar_text_zoom
+      st.caption(f"文字大小：{round(calendar_text_zoom * 100)}%")
 
     month_weeks = calendar.Calendar(firstweekday=calendar.SUNDAY).monthdayscalendar(
         calendar_year, calendar_month
@@ -344,7 +454,45 @@ if app_mode == "一、 萬年曆與個人提醒":
         /* # 1 手機月曆：縮小文字並讓農曆標籤完整顯示 */
         /* # 1 手機查詢結果：縮小文字並允許換行，避免內容遭截斷 */
         /* # 2 A−／A+ 縮放倍率同步套用至月曆格與查詢結果 */
+        @keyframes calendar-event-scroll {{
+          from {{ transform: translateX(0); }}
+          to {{ transform: translateX(-50%); }}
+        }}
+        .st-key-calendar_event_ticker {{
+          overflow: hidden;
+          margin: 0.5rem 0;
+          padding: 0.4rem 0;
+          color: #c00;
+          background: #fff3f3;
+          border-radius: 0.4rem;
+          font-weight: bold;
+          font-size: {0.9 * calendar_text_zoom:.2f}rem;
+        }}
+        .st-key-calendar_event_ticker .event-marquee-track {{
+          display: flex;
+          width: max-content;
+          animation: calendar-event-scroll 16s linear infinite;
+        }}
+        .st-key-calendar_event_ticker .event-marquee-track span {{
+          flex: 0 0 auto;
+          padding-right: 2rem;
+        }}
+        @media (prefers-reduced-motion: reduce) {{
+          .st-key-calendar_event_ticker .event-marquee-track {{
+            animation: none;
+          }}
+        }}
         @media (max-width: 768px) {{
+          .st-key-calendar_controls [data-testid="stHorizontalBlock"] {{
+            flex-wrap: nowrap !important;
+            gap: 0.35rem !important;
+          }}
+          .st-key-calendar_controls [data-testid="stColumn"] {{
+            flex: 1 1 0% !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            padding: 0 !important;
+          }}
           .st-key-calendar_month_grid [data-testid="stVerticalBlock"] {{
             gap: 0.12rem !important;
           }}
@@ -469,6 +617,19 @@ if app_mode == "一、 萬年曆與個人提醒":
               )
             #! 新增結束
 
+    # 3 選到年度活動日期時，在月曆下方顯示醒目的活動跑馬燈
+    selected_calendar_events = calendar_events_by_date.get(selected_date, [])
+    if selected_calendar_events:
+      ticker_text = "　 🏮　✦　 ".join(selected_calendar_events)
+      with st.container(key="calendar_event_ticker"):
+        st.markdown(
+            f"<div class='event-marquee-track'>"
+            f"<span>{html.escape(ticker_text)}</span>"
+            f"<span aria-hidden='true'>{html.escape(ticker_text)}</span>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
     has_birth_time = st.checkbox("是否加入生辰時辰換算？")
     birth_hour = 12
     if has_birth_time:
@@ -536,21 +697,12 @@ if app_mode == "一、 萬年曆與個人提醒":
       #! 新增結束
       #! 新增：提示手機可使用雙指縮放檢視內容
       # 1 提示使用者可用雙指縮放
-      st.caption("手機可按 A−／A+ 調整文字大小；也可嘗試雙指縮放。")
+      st.caption("手機請使用 A−／A+ 按鈕調整文字大小。")
 
       if has_birth_time:
         st.info(
             f"🔮 生辰時辰轉換結果：**{get_shichen(birth_hour)}**（對應時間點："
             f" {birth_hour:02d}:00）"
-        )
-
-      # 2 選取宮中活動時，在查詢結果最底部同步列出活動名稱
-      selected_event_labels = calendar_events_by_date.get(selected_date, [])
-      for event_label in selected_event_labels:
-        st.markdown(
-            f"<div style='color:#d00;font-weight:bold;margin:0.25rem 0'>"
-            f"{html.escape(event_label)}</div>",
-            unsafe_allow_html=True,
         )
 
     except Exception as e:
@@ -562,14 +714,58 @@ if app_mode == "一、 萬年曆與個人提醒":
         "您可以檢視龍天宮年度行事曆，並透過下方工具產生 **Google 日曆提醒檔"
         " (.ics)**，或設定每月初一、十五提醒。"
     )
+    st.info(
+        "下載 .ics 後匯入 Google 日曆，並確認日曆通知已開啟；"
+        "匯入後 Google 日曆會依每個活動的提醒設定自動通知。"
+    )
 
-    # 顯示每月初一十五快速提示
+    # 3 匯出農曆初一、十五全年提醒，匯入 Google 日曆後由日曆推播
     st.markdown("### 🌕 每月農曆初一、十五固定參拜提醒")
     st.write(
-        "每逢農曆初一與十五，建議信眾敬香祈福。您可以手動將這兩日加入您的私人行程。"
+        "產生所選國曆年度的農曆初一、十五參拜行程，並可設定當日提醒時間。"
+    )
+    lunar_year_col, lunar_time_col = st.columns(2)
+    with lunar_year_col:
+      lunar_calendar_year = st.number_input(
+          "產生年度",
+          min_value=1911,
+          max_value=2066,
+          value=max(1911, min(date.today().year, 2066)),
+          step=1,
+          format="%d",
+          key="lunar_reminder_year",
+      )
+    with lunar_time_col:
+      lunar_reminder_time = st.time_input(
+          "初一、十五提醒時間",
+          value=datetime.time(9, 0),
+          key="lunar_reminder_time",
+      )
+    lunar_reminder_ics = generate_lunar_monthly_ics(
+        lunar_calendar_year, lunar_reminder_time
+    )
+    st.download_button(
+        label=f"📥 下載 {lunar_calendar_year} 年初一、十五提醒 (.ics)",
+        data=lunar_reminder_ics,
+        file_name=f"longtiangong_lunar_reminders_{lunar_calendar_year}.ics",
+        mime="text/calendar",
+        key="download_lunar_reminders",
     )
 
     st.markdown("### 🏮 龍天宮年度行事曆活動快速匯出")
+    # 3 年度行事曆提醒提前天數套用至各活動匯出檔
+    annual_reminder_days = st.selectbox(
+        "年度活動提醒時間",
+        options=[14, 7, 1, 0],
+        format_func=lambda days: {
+            14: "活動前 2 週",
+            7: "活動前 1 週",
+            1: "活動前 1 天",
+            0: "活動當日",
+        }[days],
+        index=0,
+        key="annual_reminder_days",
+    )
     for ev in LONGTIAN_EVENTS:
       with st.expander(
           f"📌 {ev['name']} ({ev['lunar']} / 國曆 {ev['solar']})"
@@ -579,8 +775,16 @@ if app_mode == "一、 萬年曆與個人提醒":
 
         # 產生 .ics 下載按鈕
         ev_date = datetime.datetime.strptime(ev["solar"], "%Y-%m-%d").date()
+        ev_end_date = datetime.datetime.strptime(
+            ev.get("solar_end", ev["solar"]), "%Y-%m-%d"
+        ).date()
         ics_data = generate_ics(
-            f"【龍天宮】{ev['name']}", ev_date, ev["desc"], ev["link"]
+            f"【龍天宮】{ev['name']}",
+            ev_date,
+            ev["desc"],
+            ev["link"],
+            reminder_days=annual_reminder_days,
+            event_end_date=ev_end_date,
         )
 
         st.download_button(
@@ -592,25 +796,55 @@ if app_mode == "一、 萬年曆與個人提醒":
 
     st.markdown("---")
     st.markdown("### ➕ 新增您的個人自訂活動與提醒")
+    # 3 個人活動加入開始時間與提醒，提交後的下載按鈕置於表單外
     with st.form("custom_event_form"):
       c_name = st.text_input("活動名稱", placeholder="例如：點光明燈 / 個人還願")
       c_date = st.date_input(
           "活動日期", value=date.today(), min_value=MIN_DATE
       )
+      c_time = st.time_input(
+          "活動時間",
+          value=datetime.time(9, 0),
+          key="custom_event_time",
+          help="請輸入活動開始時間；行事曆事件會設定為一小時。",
+      )
       c_desc = st.text_area("備註事項", placeholder="輸入想提醒自己的內容...")
+      c_reminder_days = st.selectbox(
+          "提醒時間",
+          options=[14, 7, 1, 0],
+          format_func=lambda days: {
+              14: "活動前 2 週",
+              7: "活動前 1 週",
+              1: "活動前 1 天",
+              0: "活動當日",
+          }[days],
+          index=0,
+      )
       submitted = st.form_submit_button("產生個人日曆提醒檔")
 
-      if submitted:
-        c_ics = generate_ics(
-            f"【個人提醒】{c_name}", c_date, c_desc, "https://longtiangong.github.io/homepage/"
+    if submitted:
+      if not c_name.strip():
+        st.session_state.pop("custom_event_ics", None)
+        st.error("請先輸入活動名稱，再產生日曆提醒檔。")
+      else:
+        st.session_state.custom_event_ics = generate_ics(
+            f"【個人提醒】{c_name.strip()}",
+            c_date,
+            c_desc,
+            "https://longtiangong.github.io/homepage/",
+            event_time=c_time,
+            reminder_days=c_reminder_days,
         )
         st.success("✅ 您的個人提醒檔已產生！")
-        st.download_button(
-            label="📥 儲存至手機/Google日曆",
-            data=c_ics,
-            file_name=f"custom_reminder.ics",
-            mime="text/calendar",
-        )
+
+    if st.session_state.get("custom_event_ics"):
+      st.download_button(
+          label="📥 儲存至手機/Google日曆",
+          data=st.session_state.custom_event_ics,
+          file_name="custom_reminder.ics",
+          mime="text/calendar",
+          key="download_custom_reminder",
+      )
 
 
 # ==========================================
