@@ -818,25 +818,13 @@ if app_mode == "一、 萬年曆與個人提醒":
     )
 
     st.markdown("### 🏮 龍天宮年度行事曆活動快速匯出")
-    # 3 年度活動可複選多個提醒時間，全部套用至匯出檔中的每場活動
-    annual_reminder_days = st.multiselect(
-        "年度活動提醒時間",
-        options=[14, 7, 1, 0],
-        format_func=lambda days: {
-            14: "活動前 2 週（上午 9:30）",
-            7: "活動前 1 週（上午 9:30）",
-            1: "活動前 1 天（上午 9:30）",
-            0: "活動當日（上午 9:30）",
-        }[days],
-        default=[14, 0],
-        key="annual_reminder_days",
-    )
+    # *6 固定年度活動提醒為活動前 3 天及活動當日上午 9:30
     st.caption(
-        "可複選；提前提醒會在所選日期上午 9:30，活動當日提醒也會在上午 9:30。"
-        "Google 日曆匯入時可能套用日曆預設通知，匯入後請檢查通知設定。"
+        "每場活動固定於活動前 3 天及活動當日上午 9:30 提醒。"
+        "匯入 Google 日曆後，請確認活動通知時間符合預期。"
     )
     annual_events_ics = generate_annual_events_ics(
-        LONGTIAN_EVENTS, annual_reminder_days
+        LONGTIAN_EVENTS, [3, 0]
     )
     st.download_button(
         label="📥 下載龍天宮丁未年民國116(2027)年度行事曆活動 (.ics)",
