@@ -479,7 +479,7 @@ if app_mode == "一、 萬年曆與個人提醒":
         /* # *6 微調跑馬燈文字位置，避免視覺上偏低 */
         .st-key-calendar_event_ticker .event-marquee-track span {{
           position: relative;
-          top: -5px;
+          top: -7px;
         }}
         .st-key-calendar_event_ticker .event-marquee-track {{
           display: flex;
