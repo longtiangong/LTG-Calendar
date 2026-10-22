@@ -225,10 +225,10 @@ if app_mode == "一、 萬年曆與個人提醒":
     today = date.today()
     if "selected_solar_date" not in st.session_state:
       st.session_state.selected_solar_date = today
-      st.session_state.calendar_year = today.year
-      st.session_state.calendar_month = today.month
-
     selected_date = st.session_state.selected_solar_date
+    st.session_state.setdefault("calendar_year", selected_date.year)
+    st.session_state.setdefault("calendar_month", selected_date.month)
+
     st.markdown(
         f"<h2 style='text-align:center; margin-bottom:0.5rem'>"
         f"{selected_date:%Y年%m月%d日}</h2>",
