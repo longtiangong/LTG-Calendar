@@ -461,21 +461,26 @@ if app_mode == "一、 萬年曆與個人提醒":
         .st-key-calendar_event_ticker {{
           overflow: hidden;
           margin: 0.5rem 0;
-          padding: 0.4rem 0;
+          padding: 0.55rem 0;
           color: #c00;
           background: #fff3f3;
           border-radius: 0.4rem;
           font-weight: bold;
           font-size: {0.9 * calendar_text_zoom:.2f}rem;
+          line-height: 1.6;
         }}
         .st-key-calendar_event_ticker .event-marquee-track {{
           display: flex;
+          align-items: center;
           width: max-content;
+          min-height: 1.6em;
           animation: calendar-event-scroll 16s linear infinite;
         }}
         .st-key-calendar_event_ticker .event-marquee-track span {{
           flex: 0 0 auto;
+          display: block;
           padding-right: 2rem;
+          line-height: 1.6;
         }}
         @media (prefers-reduced-motion: reduce) {{
           .st-key-calendar_event_ticker .event-marquee-track {{
@@ -719,7 +724,7 @@ if app_mode == "一、 萬年曆與個人提醒":
         "匯入後 Google 日曆會依每個活動的提醒設定自動通知。"
     )
 
-    # 3 匯出農曆初一、十五全年提醒，匯入 Google 日曆後由日曆推播
+    # 4 保留可直接匯出的農曆初一、十五提醒，預設提供 2027 年
     st.markdown("### 🌕 每月農曆初一、十五固定參拜提醒")
     st.write(
         "產生所選國曆年度的農曆初一、十五參拜行程，並可設定當日提醒時間。"
@@ -730,7 +735,7 @@ if app_mode == "一、 萬年曆與個人提醒":
           "產生年度",
           min_value=1911,
           max_value=2066,
-          value=max(1911, min(date.today().year, 2066)),
+          value=2027,
           step=1,
           format="%d",
           key="lunar_reminder_year",
