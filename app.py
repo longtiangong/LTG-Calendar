@@ -268,15 +268,6 @@ if app_mode == "一、 萬年曆與個人提醒":
           label_visibility="collapsed",
       )
 
-    weekdays = st.columns(7)
-    for column, weekday in zip(
-        weekdays, ["日", "一", "二", "三", "四", "五", "六"]
-    ):
-      column.markdown(
-          f"<div style='text-align:center;font-weight:bold'>{weekday}</div>",
-          unsafe_allow_html=True,
-      )
-
     month_weeks = calendar.Calendar(firstweekday=calendar.SUNDAY).monthdayscalendar(
         calendar_year, calendar_month
     )
@@ -296,40 +287,75 @@ if app_mode == "一、 萬年曆與個人提醒":
         event_date += datetime.timedelta(days=1)
     #! 新增結束
 
-    for week in month_weeks:
-      day_columns = st.columns(7)
-      for column, day in zip(day_columns, week):
-        if day == 0:
-          continue
-        solar_date = date(calendar_year, calendar_month, day)
-        lunar_day_label = get_lunar_day_label(
-            sxtwl.fromSolar(
-                solar_date.year, solar_date.month, solar_date.day
-            ).getLunarDay()
+    #! 新增：窄螢幕維持七欄月曆，避免 Streamlit 自動堆疊欄位
+    st.markdown(
+        """
+        <style>
+        @media (max-width: 768px) {
+          .st-key-calendar_month_grid [data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 0.15rem !important;
+          }
+          .st-key-calendar_month_grid [data-testid="column"] {
+            flex: 1 1 0% !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            padding: 0 !important;
+          }
+          .st-key-calendar_month_grid button {
+            min-height: 1.8rem !important;
+            padding: 0.15rem 0 !important;
+            font-size: 0.75rem !important;
+          }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.container(key="calendar_month_grid"):
+      weekdays = st.columns(7)
+      for column, weekday in zip(
+          weekdays, ["日", "一", "二", "三", "四", "五", "六"]
+      ):
+        column.markdown(
+            f"<div style='text-align:center;font-weight:bold'>{weekday}</div>",
+            unsafe_allow_html=True,
         )
-        calendar_event_labels = calendar_events_by_date.get(solar_date, [])
-        with column:
-          if st.button(
-              str(day),
-              key=f"calendar-day-{calendar_year}-{calendar_month}-{day}",
-              type="primary" if solar_date == selected_date else "secondary",
-              use_container_width=True,
-          ):
-            st.session_state.selected_solar_date = solar_date
-            st.rerun()
-          st.markdown(
-              f"<div style='text-align:center;font-size:0.75rem;margin-top:-0.6rem'>"
-              f"{lunar_day_label}</div>",
-              unsafe_allow_html=True,
+
+      for week in month_weeks:
+        day_columns = st.columns(7)
+        for column, day in zip(day_columns, week):
+          if day == 0:
+            continue
+          solar_date = date(calendar_year, calendar_month, day)
+          lunar_day_label = get_lunar_day_label(
+              sxtwl.fromSolar(
+                  solar_date.year, solar_date.month, solar_date.day
+              ).getLunarDay()
           )
-          #! 新增：在農曆日期下方以紅字顯示宮中活動
-          for event_label in calendar_event_labels:
+          calendar_event_labels = calendar_events_by_date.get(solar_date, [])
+          with column:
+            if st.button(
+                str(day),
+                key=f"calendar-day-{calendar_year}-{calendar_month}-{day}",
+                type="primary" if solar_date == selected_date else "secondary",
+                use_container_width=True,
+            ):
+              st.session_state.selected_solar_date = solar_date
+              st.rerun()
             st.markdown(
-                f"<div style='text-align:center;color:#d00;font-size:0.7rem;"
-                f"line-height:1.2'>{html.escape(event_label)}</div>",
+                f"<div style='text-align:center;font-size:0.75rem;margin-top:-0.6rem'>"
+                f"{lunar_day_label}</div>",
                 unsafe_allow_html=True,
             )
-          #! 新增結束
+            #! 新增：在農曆日期下方以紅字顯示宮中活動
+            for event_label in calendar_event_labels:
+              st.markdown(
+                  f"<div style='text-align:center;color:#d00;font-size:0.7rem;"
+                  f"line-height:1.2'>{html.escape(event_label)}</div>",
+                  unsafe_allow_html=True,
+              )
+            #! 新增結束
 
     has_birth_time = st.checkbox("是否加入生辰時辰換算？")
     birth_hour = 12
