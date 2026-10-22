@@ -229,11 +229,19 @@ if app_mode == "一、 萬年曆與個人提醒":
     st.session_state.setdefault("calendar_year", selected_date.year)
     st.session_state.setdefault("calendar_month", selected_date.month)
 
-    st.markdown(
-        f"<h2 style='text-align:center; margin-bottom:0.5rem'>"
-        f"{selected_date:%Y年%m月%d日}</h2>",
-        unsafe_allow_html=True,
-    )
+    date_heading, today_button = st.columns([4, 1])
+    with date_heading:
+      st.markdown(
+          f"<h2 style='text-align:center; margin-bottom:0.5rem'>"
+          f"{selected_date:%Y年%m月%d日}</h2>",
+          unsafe_allow_html=True,
+      )
+    with today_button:
+      if st.button("📅 回到今天", use_container_width=True):
+        st.session_state.selected_solar_date = today
+        st.session_state.calendar_year = today.year
+        st.session_state.calendar_month = today.month
+        st.rerun()
 
     year_col, month_col = st.columns([2, 1])
     with year_col:
