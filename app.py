@@ -233,6 +233,8 @@ if app_mode == "一、 萬年曆與個人提醒":
     selected_date = st.session_state.selected_solar_date
     st.session_state.setdefault("calendar_year", selected_date.year)
     st.session_state.setdefault("calendar_month", selected_date.month)
+    # 2 保存手機月曆與結果文字的縮放倍率
+    st.session_state.setdefault("calendar_text_zoom", 1.0)
 
     date_heading, today_button = st.columns([4, 1])
     with date_heading:
@@ -245,14 +247,36 @@ if app_mode == "一、 萬年曆與個人提醒":
       if st.button("📅 回到今天", use_container_width=True):
         st.session_state.selected_solar_date = today
         st.session_state.calendar_year = today.year
+        st.session_state.calendar_year_group = (
+            "1911–2000" if today.year <= 2000 else "2001–2066"
+        )
         st.session_state.calendar_month = today.month
         st.rerun()
 
-    year_col, month_col = st.columns([2, 1])
+    # 2 年份分組選擇，縮短年份選單並快速切換歷史/未來區間
+    st.session_state.setdefault(
+        "calendar_year_group",
+        "1911–2000" if st.session_state.calendar_year <= 2000 else "2001–2066",
+    )
+    year_group_col, year_col, month_col = st.columns([1.2, 1, 1])
+    with year_group_col:
+      calendar_year_group = st.selectbox(
+          "年份範圍",
+          options=["1911–2000", "2001–2066"],
+          key="calendar_year_group",
+          label_visibility="collapsed",
+      )
+    year_options = (
+        list(range(1911, 2001))
+        if calendar_year_group == "1911–2000"
+        else list(range(2001, 2067))
+    )
+    if st.session_state.calendar_year not in year_options:
+      st.session_state.calendar_year = year_options[0]
     with year_col:
       calendar_year = st.selectbox(
           "選擇年份",
-          options=list(range(1911, 2067)),
+          options=year_options,
           key="calendar_year",
           label_visibility="collapsed",
       )
@@ -267,6 +291,31 @@ if app_mode == "一、 萬年曆與個人提醒":
           key="calendar_month",
           label_visibility="collapsed",
       )
+
+    # 2 手機字體縮放：提供不依賴瀏覽器手勢的放大/縮小按鈕
+    zoom_out_col, zoom_in_col = st.columns([1, 1])
+    with zoom_out_col:
+      if st.button(
+          "A−",
+          key="calendar_zoom_out",
+          use_container_width=True,
+          disabled=st.session_state.calendar_text_zoom <= 0.7,
+      ):
+        st.session_state.calendar_text_zoom = max(
+            0.7, round(st.session_state.calendar_text_zoom - 0.2, 1)
+        )
+    with zoom_in_col:
+      if st.button(
+          "A+",
+          key="calendar_zoom_in",
+          use_container_width=True,
+          disabled=st.session_state.calendar_text_zoom >= 1.8,
+      ):
+        st.session_state.calendar_text_zoom = min(
+            1.8, round(st.session_state.calendar_text_zoom + 0.2, 1)
+        )
+    calendar_text_zoom = st.session_state.calendar_text_zoom
+    st.caption(f"文字大小：{round(calendar_text_zoom * 100)}%")
 
     month_weeks = calendar.Calendar(firstweekday=calendar.SUNDAY).monthdayscalendar(
         calendar_year, calendar_month
@@ -290,83 +339,84 @@ if app_mode == "一、 萬年曆與個人提醒":
     # 1 手機月曆：縮小日期格字體，並讓農曆文字完整顯示
     #! 新增：窄螢幕維持七欄月曆，避免 Streamlit 自動堆疊欄位
     st.markdown(
-        """
+        f"""
         <style>
         /* # 1 手機月曆：縮小文字並讓農曆標籤完整顯示 */
         /* # 1 手機查詢結果：縮小文字並允許換行，避免內容遭截斷 */
-        @media (max-width: 768px) {
-          .st-key-calendar_month_grid [data-testid="stVerticalBlock"] {
+        /* # 2 A−／A+ 縮放倍率同步套用至月曆格與查詢結果 */
+        @media (max-width: 768px) {{
+          .st-key-calendar_month_grid [data-testid="stVerticalBlock"] {{
             gap: 0.12rem !important;
-          }
-          .st-key-calendar_month_grid [data-testid="stHorizontalBlock"] {
+          }}
+          .st-key-calendar_month_grid [data-testid="stHorizontalBlock"] {{
             flex-wrap: nowrap !important;
             gap: 0.08rem !important;
-          }
-          .st-key-calendar_month_grid [data-testid="stColumn"] {
+          }}
+          .st-key-calendar_month_grid [data-testid="stColumn"] {{
             flex: 1 1 0% !important;
             width: 0 !important;
             min-width: 0 !important;
             padding: 0 !important;
-          }
-          .st-key-calendar_month_grid button {
-            min-height: 1.2rem !important;
-            height: 1.2rem !important;
+          }}
+          .st-key-calendar_month_grid button {{
+            min-height: {1.2 * calendar_text_zoom:.2f}rem !important;
+            height: {1.2 * calendar_text_zoom:.2f}rem !important;
             padding: 0 !important;
-            font-size: 0.65rem !important;
+            font-size: {0.65 * calendar_text_zoom:.2f}rem !important;
             line-height: 1 !important;
-          }
-          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] p {
+          }}
+          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] p {{
             margin: 0 !important;
             padding: 0 !important;
-            font-size: 0.55rem !important;
-            line-height: 0.75rem !important;
-          }
-          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] {
+            font-size: {0.55 * calendar_text_zoom:.2f}rem !important;
+            line-height: {0.75 * calendar_text_zoom:.2f}rem !important;
+          }}
+          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] {{
             overflow: visible;
-          }
-          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] div {
+          }}
+          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] div {{
             white-space: normal;
             overflow: visible;
             overflow-wrap: anywhere;
-          }
-          .st-key-calendar_month_grid .lunar-label {
-            font-size: 0.55rem !important;
-            line-height: 0.75rem !important;
+          }}
+          .st-key-calendar_month_grid .lunar-label {{
+            font-size: {0.55 * calendar_text_zoom:.2f}rem !important;
+            line-height: {0.75 * calendar_text_zoom:.2f}rem !important;
             overflow-wrap: normal !important;
             word-break: keep-all;
-          }
-          .st-key-calendar_month_grid .event-label {
-            font-size: 0.5rem !important;
-            line-height: 0.65rem !important;
+          }}
+          .st-key-calendar_month_grid .event-label {{
+            font-size: {0.5 * calendar_text_zoom:.2f}rem !important;
+            line-height: {0.65 * calendar_text_zoom:.2f}rem !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: clip;
-          }
-        }
-        @media (max-width: 768px) {
-          .st-key-calendar_results [data-testid="stHorizontalBlock"] {
+          }}
+        }}
+        @media (max-width: 768px) {{
+          .st-key-calendar_results [data-testid="stHorizontalBlock"] {{
             flex-wrap: wrap !important;
             gap: 0.25rem !important;
-          }
-          .st-key-calendar_results [data-testid="stColumn"] {
+          }}
+          .st-key-calendar_results [data-testid="stColumn"] {{
             flex: 1 1 100% !important;
             width: 100% !important;
             min-width: 100% !important;
-          }
-          .st-key-calendar_results [data-testid="stMetricLabel"] {
-            font-size: 0.7rem !important;
-          }
+          }}
+          .st-key-calendar_results [data-testid="stMetricLabel"] {{
+            font-size: {0.7 * calendar_text_zoom:.2f}rem !important;
+          }}
           .st-key-calendar_results [data-testid="stMetricValue"],
-          .st-key-calendar_results [data-testid="stMetricValue"] p {
-            font-size: 0.85rem !important;
-            line-height: 1.2 !important;
+          .st-key-calendar_results [data-testid="stMetricValue"] p {{
+            font-size: {0.85 * calendar_text_zoom:.2f}rem !important;
+            line-height: {1.2 * calendar_text_zoom:.2f} !important;
             margin: 0 !important;
             white-space: normal !important;
             overflow: visible !important;
             overflow-wrap: anywhere !important;
             word-break: normal !important;
-          }
-        }
+          }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -486,12 +536,21 @@ if app_mode == "一、 萬年曆與個人提醒":
       #! 新增結束
       #! 新增：提示手機可使用雙指縮放檢視內容
       # 1 提示使用者可用雙指縮放
-      st.caption("手機可使用雙指放大或縮小檢視。")
+      st.caption("手機可按 A−／A+ 調整文字大小；也可嘗試雙指縮放。")
 
       if has_birth_time:
         st.info(
             f"🔮 生辰時辰轉換結果：**{get_shichen(birth_hour)}**（對應時間點："
             f" {birth_hour:02d}:00）"
+        )
+
+      # 2 選取宮中活動時，在查詢結果最底部同步列出活動名稱
+      selected_event_labels = calendar_events_by_date.get(selected_date, [])
+      for event_label in selected_event_labels:
+        st.markdown(
+            f"<div style='color:#d00;font-weight:bold;margin:0.25rem 0'>"
+            f"{html.escape(event_label)}</div>",
+            unsafe_allow_html=True,
         )
 
     except Exception as e:
