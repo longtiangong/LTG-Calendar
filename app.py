@@ -461,7 +461,7 @@ if app_mode == "一、 萬年曆與個人提醒":
         .st-key-calendar_event_ticker {{
           overflow: hidden;
           margin: 0.5rem 0;
-          padding: 0.55rem 0;
+          padding: 0.65rem 0;
           color: #c00;
           background: #fff3f3;
           border-radius: 0.4rem;
@@ -469,11 +469,18 @@ if app_mode == "一、 萬年曆與個人提醒":
           font-size: {0.9 * calendar_text_zoom:.2f}rem;
           line-height: 1.6;
         }}
+        # * 5 跑馬燈文字垂直置中，避免貼近背景邊緣而被裁切
+        /* # 5 跑馬燈文字垂直置中，避免貼近背景邊緣而被裁切 */
+        .st-key-calendar_event_ticker [data-testid="stMarkdownContainer"] {{
+          display: flex;
+          align-items: center;
+          min-height: 2.6em;
+        }}
         .st-key-calendar_event_ticker .event-marquee-track {{
           display: flex;
           align-items: center;
           width: max-content;
-          min-height: 1.6em;
+          min-height: 100%;
           animation: calendar-event-scroll 16s linear infinite;
         }}
         .st-key-calendar_event_ticker .event-marquee-track span {{
