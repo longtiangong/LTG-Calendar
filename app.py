@@ -245,6 +245,35 @@ def generate_ics(
   )
 
 
+def generate_annual_events_ics(events, reminder_days):
+  """將龍天宮年度活動整合為單一可匯入的 iCalendar 檔案。"""
+  calendar_lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//LongTianGong//Calendar//ZH",
+  ]
+  for event in events:
+    event_date = datetime.datetime.strptime(event["solar"], "%Y-%m-%d").date()
+    event_end_date = datetime.datetime.strptime(
+        event.get("solar_end", event["solar"]), "%Y-%m-%d"
+    ).date()
+    event_ics = generate_ics(
+        f"【龍天宮】{event['name']}",
+        event_date,
+        event["desc"],
+        event["link"],
+        reminder_days=reminder_days,
+        event_end_date=event_end_date,
+    )
+    event_lines = event_ics.splitlines()
+    event_start = event_lines.index("BEGIN:VEVENT")
+    event_end = event_lines.index("END:VEVENT", event_start)
+    calendar_lines.extend(event_lines[event_start:event_end + 1])
+
+  calendar_lines.extend(["END:VCALENDAR", ""])
+  return "\r\n".join(calendar_lines)
+
+
 def generate_lunar_monthly_ics(year, reminder_time):
   """產生指定國曆年度農曆初一、十五的提醒日曆。"""
   event_components = []
@@ -783,33 +812,16 @@ if app_mode == "一、 萬年曆與個人提醒":
         index=0,
         key="annual_reminder_days",
     )
-    for ev in LONGTIAN_EVENTS:
-      with st.expander(
-          f"📌 {ev['name']} ({ev['lunar']} / 國曆 {ev['solar']})"
-      ):
-        st.write(f"**活動說明**：{ev['desc']}")
-        st.markdown(f"**報名連結**：[點擊前往報名]({ev['link']})")
-
-        # 產生 .ics 下載按鈕
-        ev_date = datetime.datetime.strptime(ev["solar"], "%Y-%m-%d").date()
-        ev_end_date = datetime.datetime.strptime(
-            ev.get("solar_end", ev["solar"]), "%Y-%m-%d"
-        ).date()
-        ics_data = generate_ics(
-            f"【龍天宮】{ev['name']}",
-            ev_date,
-            ev["desc"],
-            ev["link"],
-            reminder_days=annual_reminder_days,
-            event_end_date=ev_end_date,
-        )
-
-        st.download_button(
-            label=f"📥 下載「{ev['name']}」Google日曆提醒 (.ics)",
-            data=ics_data,
-            file_name=f"{ev['name']}.ics",
-            mime="text/calendar",
-        )
+    annual_events_ics = generate_annual_events_ics(
+        LONGTIAN_EVENTS, annual_reminder_days
+    )
+    st.download_button(
+        label="📥 下載龍天宮年度行事曆全部活動 (.ics)",
+        data=annual_events_ics,
+        file_name="longtiangong_annual_events.ics",
+        mime="text/calendar",
+        key="download_annual_events",
+    )
 
     st.markdown("---")
     st.markdown("### ➕ 新增您的個人自訂活動與提醒")
