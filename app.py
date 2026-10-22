@@ -132,6 +132,31 @@ END:VCALENDAR"""
   return ics_content
 
 
+def get_ganzhi(day_obj, target):
+  """相容新版/舊版 sxtwl 的干支取值 API。"""
+  getter_name = {
+      "year": "getYearGZ",
+      "month": "getMonthGZ",
+      "day": "getDayGZ",
+  }.get(target)
+  if not getter_name:
+    raise ValueError(f"Unsupported Ganzhi target: {target}")
+
+  getter = getattr(day_obj, getter_name, None)
+  if callable(getter):
+    gz = getter()
+  else:
+    legacy_getter = getattr(day_obj, f"{target}GZ", None)
+    if callable(legacy_getter):
+      gz = legacy_getter()
+    else:
+      raise AttributeError(f"{type(day_obj).__name__} object has no attribute '{getter_name}'")
+
+  if hasattr(gz, "gz"):
+    return gz.gz
+  return gz
+
+
 # --- 側邊欄導覽 ---
 st.sidebar.title("🏮 龍天宮導覽選單")
 app_mode = st.sidebar.radio(
@@ -238,11 +263,12 @@ if app_mode == "一、 萬年曆與個人提醒":
       lunar_str = f"農曆 {lunar_year}年 {m_str}{d_str}"
 
       # 天干地支 (年月日干支)
-      y_gz = f"{TIANGAN[day_obj.yearGZ().gz.tg]}{DIZHI[day_obj.yearGZ().gz.dz]}年"
-      m_gz = (
-          f"{TIANGAN[day_obj.monthGZ().gz.tg]}{DIZHI[day_obj.monthGZ().gz.dz]}月"
-      )
-      d_gz = f"{TIANGAN[day_obj.dayGZ().gz.tg]}{DIZHI[day_obj.dayGZ().gz.dz]}日"
+      year_gz = get_ganzhi(day_obj, "year")
+      month_gz = get_ganzhi(day_obj, "month")
+      day_gz = get_ganzhi(day_obj, "day")
+      y_gz = f"{TIANGAN[year_gz.tg]}{DIZHI[year_gz.dz]}年"
+      m_gz = f"{TIANGAN[month_gz.tg]}{DIZHI[month_gz.dz]}月"
+      d_gz = f"{TIANGAN[day_gz.tg]}{DIZHI[day_gz.dz]}日"
 
       st.success("✨ 查詢結果對照：")
       res_col1, res_col2, res_col3 = st.columns(3)
