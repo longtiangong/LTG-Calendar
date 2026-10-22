@@ -798,7 +798,7 @@ if app_mode == "一、 萬年曆與個人提醒":
         key="download_lunar_reminders",
     )
 
-    st.markdown("### 🏮 龍天宮年度行事曆活動快速匯出")
+    st.markdown("### 🏮 龍天宮丁未年民國116(2027)年度行事曆活動快速匯出")
     # 3 年度行事曆提醒提前天數套用至各活動匯出檔
     annual_reminder_days = st.selectbox(
         "年度活動提醒時間",
