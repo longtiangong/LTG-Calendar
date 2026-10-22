@@ -221,14 +221,20 @@ def generate_ics(
         ]
     )
 
-  if reminder_days is not None:
-    trigger = f"-P{reminder_days}D" if reminder_days else "PT0M"
+  reminder_days_list = (
+      [reminder_days]
+      if isinstance(reminder_days, int)
+      else reminder_days or []
+  )
+  for days in reminder_days_list:
+    trigger = f"-P{days}D" if days else "PT0M"
+    reminder_label = f"活動前 {days} 天" if days else "活動當日"
     event_lines.extend(
         [
             "BEGIN:VALARM",
             f"TRIGGER:{trigger}",
             "ACTION:DISPLAY",
-            f"DESCRIPTION:{escape_ics_text(event_name)}",
+            f"DESCRIPTION:{escape_ics_text(event_name)} - {reminder_label}",
             "END:VALARM",
         ]
     )
@@ -799,8 +805,8 @@ if app_mode == "一、 萬年曆與個人提醒":
     )
 
     st.markdown("### 🏮 龍天宮年度行事曆活動快速匯出")
-    # 3 年度行事曆提醒提前天數套用至各活動匯出檔
-    annual_reminder_days = st.selectbox(
+    # 3 年度活動可複選多個提醒時間，全部套用至匯出檔中的每場活動
+    annual_reminder_days = st.multiselect(
         "年度活動提醒時間",
         options=[14, 7, 1, 0],
         format_func=lambda days: {
@@ -809,9 +815,10 @@ if app_mode == "一、 萬年曆與個人提醒":
             1: "活動前 1 天",
             0: "活動當日",
         }[days],
-        index=0,
+        default=[14, 0],
         key="annual_reminder_days",
     )
+    st.caption("可複選，例如「活動前 1 週」及「活動當日」都會各提醒一次。")
     annual_events_ics = generate_annual_events_ics(
         LONGTIAN_EVENTS, annual_reminder_days
     )
