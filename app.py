@@ -247,16 +247,12 @@ if app_mode == "一、 萬年曆與個人提醒":
     with year_col:
       calendar_year = st.selectbox(
           "選擇年份",
-          options=list(range(1911, today.year + 1)),
+          options=list(range(1911, 2067)),
           key="calendar_year",
           label_visibility="collapsed",
       )
     with month_col:
-      available_months = (
-          list(range(1, today.month + 1))
-          if calendar_year == today.year
-          else list(range(1, 13))
-      )
+      available_months = list(range(1, 13))
       if st.session_state.calendar_month not in available_months:
         st.session_state.calendar_month = available_months[-1]
       calendar_month = st.selectbox(
@@ -295,7 +291,6 @@ if app_mode == "一、 萬年曆與個人提醒":
               str(day),
               key=f"calendar-day-{calendar_year}-{calendar_month}-{day}",
               type="primary" if solar_date == selected_date else "secondary",
-              disabled=solar_date > today,
               use_container_width=True,
           ):
             st.session_state.selected_solar_date = solar_date
