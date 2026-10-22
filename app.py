@@ -287,10 +287,13 @@ if app_mode == "一、 萬年曆與個人提醒":
         event_date += datetime.timedelta(days=1)
     #! 新增結束
 
+    # 1 手機月曆：縮小日期格字體，並讓農曆文字完整顯示
     #! 新增：窄螢幕維持七欄月曆，避免 Streamlit 自動堆疊欄位
     st.markdown(
         """
         <style>
+        /* # 1 手機月曆：縮小文字並讓農曆標籤完整顯示 */
+        /* # 1 手機查詢結果：縮小文字並允許換行，避免內容遭截斷 */
         @media (max-width: 768px) {
           .st-key-calendar_month_grid [data-testid="stVerticalBlock"] {
             gap: 0.12rem !important;
@@ -319,12 +322,49 @@ if app_mode == "一、 萬年曆與個人提醒":
             line-height: 0.75rem !important;
           }
           .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] {
-            overflow: hidden;
+            overflow: visible;
           }
           .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] div {
-            white-space: nowrap;
-            overflow: hidden;
+            white-space: normal;
+            overflow: visible;
+            overflow-wrap: anywhere;
+          }
+          .st-key-calendar_month_grid .lunar-label {
+            font-size: 0.55rem !important;
+            line-height: 0.75rem !important;
+            overflow-wrap: normal !important;
+            word-break: keep-all;
+          }
+          .st-key-calendar_month_grid .event-label {
+            font-size: 0.5rem !important;
+            line-height: 0.65rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
             text-overflow: clip;
+          }
+        }
+        @media (max-width: 768px) {
+          .st-key-calendar_results [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 0.25rem !important;
+          }
+          .st-key-calendar_results [data-testid="stColumn"] {
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            min-width: 100% !important;
+          }
+          .st-key-calendar_results [data-testid="stMetricLabel"] {
+            font-size: 0.7rem !important;
+          }
+          .st-key-calendar_results [data-testid="stMetricValue"],
+          .st-key-calendar_results [data-testid="stMetricValue"] p {
+            font-size: 0.85rem !important;
+            line-height: 1.2 !important;
+            margin: 0 !important;
+            white-space: normal !important;
+            overflow: visible !important;
+            overflow-wrap: anywhere !important;
+            word-break: normal !important;
           }
         }
         </style>
@@ -363,15 +403,16 @@ if app_mode == "一、 萬年曆與個人提醒":
               st.session_state.selected_solar_date = solar_date
               st.rerun()
             st.markdown(
-                f"<div style='text-align:center;font-size:0.75rem;"
-                f"line-height:1;margin-top:-0.25rem'>"
+                f"<div class='lunar-label' style='text-align:center;"
+                f"font-size:0.75rem;line-height:1;margin-top:-0.25rem'>"
                 f"{lunar_day_label}</div>",
                 unsafe_allow_html=True,
             )
             #! 新增：在農曆日期下方以紅字顯示宮中活動
             for event_label in calendar_event_labels:
               st.markdown(
-                  f"<div style='text-align:center;color:#d00;font-size:0.7rem;"
+                  f"<div class='event-label' style='text-align:center;"
+                  f"color:#d00;font-size:0.7rem;"
                   f"line-height:1;white-space:nowrap;overflow:hidden;"
                   f"text-overflow:clip'>{html.escape(event_label)}</div>",
                   unsafe_allow_html=True,
@@ -432,13 +473,20 @@ if app_mode == "一、 萬年曆與個人提醒":
       d_gz = f"{TIANGAN[day_gz.tg]}{DIZHI[day_gz.dz]}日"
 
       st.success("✨ 查詢結果對照：")
-      res_col1, res_col2, res_col3 = st.columns(3)
-      with res_col1:
-        st.metric("國曆日期", selected_date.strftime("%Y年%m月%d日"))
-      with res_col2:
-        st.metric("中國農曆", lunar_str)
-      with res_col3:
-        st.metric("天干地支", f"{y_gz} {m_gz} {d_gz}")
+      #! 新增：手機上讓日期換行並縮小字體，避免查詢結果被截斷
+      # 1 手機查詢結果：將三項結果放入專屬容器，套用手機版樣式
+      with st.container(key="calendar_results"):
+        res_col1, res_col2, res_col3 = st.columns(3)
+        with res_col1:
+          st.metric("國曆日期", selected_date.strftime("%Y年%m月%d日"))
+        with res_col2:
+          st.metric("農曆日期", lunar_str)
+        with res_col3:
+          st.metric("天干地支", f"{y_gz} {m_gz} {d_gz}")
+      #! 新增結束
+      #! 新增：提示手機可使用雙指縮放檢視內容
+      # 1 提示使用者可用雙指縮放
+      st.caption("手機可使用雙指放大或縮小檢視。")
 
       if has_birth_time:
         st.info(
