@@ -1,5 +1,6 @@
 import calendar
 import datetime
+import html  #! 新增：安全輸出月曆活動名稱
 from datetime import date
 import streamlit as st
 import sxtwl  # 用於農曆與天干地支計算
@@ -22,6 +23,8 @@ LONGTIAN_EVENTS = [
     },
     {
         "name": "丁未年正月光明燈太歲平安年斗",
+        #! 新增：月曆上顯示的精簡活動名稱
+        "calendar_label": "正月光明燈太歲平安年斗",
         "lunar": "1月09日",
         "solar": "2027-02-14",
         "desc": "開燈開斗日",
@@ -29,6 +32,8 @@ LONGTIAN_EVENTS = [
     },
     {
         "name": "二月南巡進香",
+        #! 新增：南巡進香為期兩日，月曆標註兩天
+        "solar_end": "2027-03-14",
         "lunar": "2月06日-07日",
         "solar": "2027-03-13",
         "desc": "南巡進香日（兩日）",
@@ -275,6 +280,22 @@ if app_mode == "一、 萬年曆與個人提醒":
     month_weeks = calendar.Calendar(firstweekday=calendar.SUNDAY).monthdayscalendar(
         calendar_year, calendar_month
     )
+    #! 新增：將年度活動日期展開為月曆查詢索引（支援多日活動）
+    calendar_events_by_date = {}
+    for event in LONGTIAN_EVENTS:
+      event_date = datetime.datetime.strptime(
+          event["solar"], "%Y-%m-%d"
+      ).date()
+      event_end_date = datetime.datetime.strptime(
+          event.get("solar_end", event["solar"]), "%Y-%m-%d"
+      ).date()
+      while event_date <= event_end_date:
+        calendar_events_by_date.setdefault(event_date, []).append(
+            event.get("calendar_label", event["name"])
+        )
+        event_date += datetime.timedelta(days=1)
+    #! 新增結束
+
     for week in month_weeks:
       day_columns = st.columns(7)
       for column, day in zip(day_columns, week):
@@ -286,6 +307,7 @@ if app_mode == "一、 萬年曆與個人提醒":
                 solar_date.year, solar_date.month, solar_date.day
             ).getLunarDay()
         )
+        calendar_event_labels = calendar_events_by_date.get(solar_date, [])
         with column:
           if st.button(
               str(day),
@@ -300,6 +322,14 @@ if app_mode == "一、 萬年曆與個人提醒":
               f"{lunar_day_label}</div>",
               unsafe_allow_html=True,
           )
+          #! 新增：在農曆日期下方以紅字顯示宮中活動
+          for event_label in calendar_event_labels:
+            st.markdown(
+                f"<div style='text-align:center;color:#d00;font-size:0.7rem;"
+                f"line-height:1.2'>{html.escape(event_label)}</div>",
+                unsafe_allow_html=True,
+            )
+          #! 新增結束
 
     has_birth_time = st.checkbox("是否加入生辰時辰換算？")
     birth_hour = 12
