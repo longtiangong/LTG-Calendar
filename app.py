@@ -292,20 +292,39 @@ if app_mode == "一、 萬年曆與個人提醒":
         """
         <style>
         @media (max-width: 768px) {
+          .st-key-calendar_month_grid [data-testid="stVerticalBlock"] {
+            gap: 0.12rem !important;
+          }
           .st-key-calendar_month_grid [data-testid="stHorizontalBlock"] {
             flex-wrap: nowrap !important;
-            gap: 0.15rem !important;
+            gap: 0.08rem !important;
           }
-          .st-key-calendar_month_grid [data-testid="column"] {
+          .st-key-calendar_month_grid [data-testid="stColumn"] {
             flex: 1 1 0% !important;
             width: 0 !important;
             min-width: 0 !important;
             padding: 0 !important;
           }
           .st-key-calendar_month_grid button {
-            min-height: 1.8rem !important;
-            padding: 0.15rem 0 !important;
-            font-size: 0.75rem !important;
+            min-height: 1.2rem !important;
+            height: 1.2rem !important;
+            padding: 0 !important;
+            font-size: 0.65rem !important;
+            line-height: 1 !important;
+          }
+          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] p {
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 0.55rem !important;
+            line-height: 0.75rem !important;
+          }
+          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] {
+            overflow: hidden;
+          }
+          .st-key-calendar_month_grid [data-testid="stMarkdownContainer"] div {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
           }
         }
         </style>
@@ -344,7 +363,8 @@ if app_mode == "一、 萬年曆與個人提醒":
               st.session_state.selected_solar_date = solar_date
               st.rerun()
             st.markdown(
-                f"<div style='text-align:center;font-size:0.75rem;margin-top:-0.6rem'>"
+                f"<div style='text-align:center;font-size:0.75rem;"
+                f"line-height:1;margin-top:-0.25rem'>"
                 f"{lunar_day_label}</div>",
                 unsafe_allow_html=True,
             )
@@ -352,7 +372,8 @@ if app_mode == "一、 萬年曆與個人提醒":
             for event_label in calendar_event_labels:
               st.markdown(
                   f"<div style='text-align:center;color:#d00;font-size:0.7rem;"
-                  f"line-height:1.2'>{html.escape(event_label)}</div>",
+                  f"line-height:1;white-space:nowrap;overflow:hidden;"
+                  f"text-overflow:clip'>{html.escape(event_label)}</div>",
                   unsafe_allow_html=True,
               )
             #! 新增結束
