@@ -767,8 +767,9 @@ if app_mode == "一、 萬年曆與個人提醒":
         " (.ics)**，或設定每月初一、十五提醒。"
     )
     st.info(
-        "下載 .ics 後匯入 Google 日曆，並確認日曆通知已開啟；"
-        "匯入後 Google 日曆會依每個活動的提醒設定自動通知。"
+        "下載 .ics 後可匯入 Google 日曆。提醒設定會寫入檔案，但 Google 日曆匯入時"
+        "不一定保留多組提醒；請匯入後檢查活動的通知設定。若只顯示一個提醒，"
+        "可能是套用了該日曆的預設通知。"
     )
 
     # 4 保留可直接匯出的農曆初一、十五提醒，預設提供 2027 年
@@ -818,7 +819,10 @@ if app_mode == "一、 萬年曆與個人提醒":
         default=[14, 0],
         key="annual_reminder_days",
     )
-    st.caption("可複選，例如「活動前 1 週」及「活動當日」都會各提醒一次。")
+    st.caption(
+        "可複選；選項會各自寫入 .ics，但匯入後是否都保留，仍須在 Google 日曆檢查。"
+        "如需確保多組提醒，需使用 Google Calendar API 同步。"
+    )
     annual_events_ics = generate_annual_events_ics(
         LONGTIAN_EVENTS, annual_reminder_days
     )
