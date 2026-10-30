@@ -128,6 +128,14 @@ LUNAR_DAY_CN = [
 MIN_DATE = date(1911, 1, 1)
 
 
+def format_roc_year(solar_year):
+  return f"民國{solar_year - 1911}年({solar_year}年)"
+
+
+def format_solar_date(solar_date):
+  return f"{format_roc_year(solar_date.year)}{solar_date:%m月%d日}"
+
+
 def get_lunar_day_label(lunar_day):
   if not 1 <= lunar_day <= len(LUNAR_DAY_CN):
     raise ValueError(f"Unsupported lunar day: {lunar_day}")
@@ -414,7 +422,7 @@ if app_mode == "一、 萬年曆與個人提醒":
     with date_heading:
       st.markdown(
           f"<h2 style='text-align:center; margin-bottom:0.5rem'>"
-          f"{selected_date:%Y年%m月%d日}</h2>",
+          f"{format_solar_date(selected_date)}</h2>",
           unsafe_allow_html=True,
       )
     with today_button:
@@ -437,6 +445,7 @@ if app_mode == "一、 萬年曆與個人提醒":
             key="calendar_year",
             label_visibility="collapsed",
         )
+        st.caption(format_roc_year(calendar_year))
       with month_col:
         available_months = list(range(1, 13))
         if st.session_state.calendar_month not in available_months:
@@ -753,7 +762,7 @@ if app_mode == "一、 萬年曆與個人提醒":
       with st.container(key="calendar_results"):
         res_col1, res_col2, res_col3 = st.columns(3)
         with res_col1:
-          st.metric("國曆日期", selected_date.strftime("%Y年%m月%d日"))
+          st.metric("國曆日期", format_solar_date(selected_date))
         with res_col2:
           st.metric("農曆日期", lunar_str)
         with res_col3:
@@ -800,6 +809,7 @@ if app_mode == "一、 萬年曆與個人提醒":
           format="%d",
           key="lunar_reminder_year",
       )
+      st.caption(format_roc_year(lunar_calendar_year))
     with lunar_time_col:
       lunar_reminder_time = st.time_input(
           "初一、十五提醒時間",
@@ -810,9 +820,15 @@ if app_mode == "一、 萬年曆與個人提醒":
         lunar_calendar_year, lunar_reminder_time
     )
     st.download_button(
-        label=f"📥 下載 {lunar_calendar_year} 年初一、十五提醒 (.ics)",
+        label=(
+            f"📥 下載 {format_roc_year(lunar_calendar_year)}"
+            "初一、十五提醒 (.ics)"
+        ),
         data=lunar_reminder_ics,
-        file_name=f"longtiangong_lunar_reminders_{lunar_calendar_year}.ics",
+        file_name=(
+            f"longtiangong_lunar_reminders_"
+            f"{format_roc_year(lunar_calendar_year)}.ics"
+        ),
         mime="text/calendar",
         key="download_lunar_reminders",
     )
@@ -827,7 +843,7 @@ if app_mode == "一、 萬年曆與個人提醒":
         LONGTIAN_EVENTS, [3, 0]
     )
     st.download_button(
-        label="📥 下載龍天宮丁未年民國116(2027)年度行事曆活動 (.ics)",
+        label="📥 下載龍天宮丁未年民國116年(2027年)年度行事曆活動 (.ics)",
         data=annual_events_ics,
         file_name="longtiangong_annual_events.ics",
         mime="text/calendar",
@@ -842,6 +858,7 @@ if app_mode == "一、 萬年曆與個人提醒":
       c_date = st.date_input(
           "活動日期", value=date.today(), min_value=MIN_DATE
       )
+      st.caption(format_solar_date(c_date))
       c_time = st.time_input(
           "活動時間",
           value=datetime.time(9, 0),
@@ -875,7 +892,9 @@ if app_mode == "一、 萬年曆與個人提醒":
             event_time=c_time,
             reminder_days=c_reminder_days,
         )
-        st.success("✅ 您的個人提醒檔已產生！")
+        st.success(
+            f"✅ 您的個人提醒（{format_solar_date(c_date)}）檔已產生！"
+        )
 
     if st.session_state.get("custom_event_ics"):
       st.download_button(
@@ -892,7 +911,10 @@ if app_mode == "一、 萬年曆與個人提醒":
 # ==========================================
 elif app_mode == "二、 龍天宮法會及進香活動":
   st.title("🏮 龍天宮法會及進香活動專區")
-  st.markdown("歡迎隨時查詢丁未年（民國116年 / 2027年）各項法會、點燈及進香日程。")
+  st.markdown(
+      f"歡迎隨時查詢丁未年（{format_roc_year(2027)}）"
+      "各項法會、點燈及進香日程。"
+  )
   st.markdown(
       "官方網站首頁：[龍天宮官方網站](https://longtiangong.github.io/homepage/)"
   )
