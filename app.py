@@ -125,11 +125,16 @@ LUNAR_DAY_CN = [
     "廿九",
     "三十",
 ]
-MIN_DATE = date(1911, 1, 1)
+ROC_YEAR_OFFSET = 1911
+MAX_CALENDAR_YEAR = 2066
 
 
 def format_roc_year(solar_year):
-  return f"民國{solar_year - 1911}年({solar_year}年)"
+  return f"民國{solar_year - ROC_YEAR_OFFSET}年({solar_year}年)"
+
+
+def solar_year_from_roc_year(roc_year):
+  return roc_year + ROC_YEAR_OFFSET
 
 
 def format_solar_date(solar_date):
@@ -412,7 +417,9 @@ if app_mode == "一、 萬年曆與個人提醒":
     if "selected_solar_date" not in st.session_state:
       st.session_state.selected_solar_date = today
     selected_date = st.session_state.selected_solar_date
-    st.session_state.setdefault("calendar_year", selected_date.year)
+    st.session_state.setdefault(
+        "calendar_roc_year", selected_date.year - ROC_YEAR_OFFSET
+    )
     st.session_state.setdefault("calendar_month", selected_date.month)
     # 2 保存手機月曆與結果文字的縮放倍率
     st.session_state.setdefault("calendar_text_zoom", 1.0)
@@ -428,7 +435,7 @@ if app_mode == "一、 萬年曆與個人提醒":
     with today_button:
       if st.button("📅 回到今天", use_container_width=True):
         st.session_state.selected_solar_date = today
-        st.session_state.calendar_year = today.year
+        st.session_state.calendar_roc_year = today.year - ROC_YEAR_OFFSET
         st.session_state.calendar_month = today.month
         st.rerun()
 
@@ -436,15 +443,16 @@ if app_mode == "一、 萬年曆與個人提醒":
       # 3 直接輸入年份，避免長下拉清單佔版面且難以快速定位
       year_col, month_col = st.columns([1, 1])
       with year_col:
-        calendar_year = st.number_input(
-            "選擇年份",
-            min_value=1911,
-            max_value=2066,
+        calendar_roc_year = st.number_input(
+            "選擇民國年份",
+            min_value=0,
+            max_value=MAX_CALENDAR_YEAR - ROC_YEAR_OFFSET,
             step=1,
             format="%d",
-            key="calendar_year",
+            key="calendar_roc_year",
             label_visibility="collapsed",
         )
+        calendar_year = solar_year_from_roc_year(calendar_roc_year)
         st.caption(format_roc_year(calendar_year))
       with month_col:
         available_months = list(range(1, 13))
@@ -800,14 +808,17 @@ if app_mode == "一、 萬年曆與個人提醒":
     )
     lunar_year_col, lunar_time_col = st.columns(2)
     with lunar_year_col:
-      lunar_calendar_year = st.number_input(
-          "產生年度",
-          min_value=1911,
-          max_value=2066,
-          value=2027,
+      lunar_calendar_roc_year = st.number_input(
+          "產生民國年度",
+          min_value=0,
+          max_value=MAX_CALENDAR_YEAR - ROC_YEAR_OFFSET,
+          value=116,
           step=1,
           format="%d",
-          key="lunar_reminder_year",
+          key="lunar_reminder_roc_year",
+      )
+      lunar_calendar_year = solar_year_from_roc_year(
+          lunar_calendar_roc_year
       )
       st.caption(format_roc_year(lunar_calendar_year))
     with lunar_time_col:
@@ -855,10 +866,41 @@ if app_mode == "一、 萬年曆與個人提醒":
     # 3 個人活動加入開始時間與提醒，提交後的下載按鈕置於表單外
     with st.form("custom_event_form"):
       c_name = st.text_input("活動名稱", placeholder="例如：點光明燈 / 個人還願")
-      c_date = st.date_input(
-          "活動日期", value=date.today(), min_value=MIN_DATE
+      today = date.today()
+      c_date_year_col, c_date_month_col, c_date_day_col = st.columns(3)
+      with c_date_year_col:
+        c_date_roc_year = st.number_input(
+            "活動日期民國年",
+            min_value=0,
+            max_value=datetime.MAXYEAR - ROC_YEAR_OFFSET,
+            value=today.year - 1911,
+            step=1,
+            format="%d",
+            key="custom_event_roc_year",
+        )
+      with c_date_month_col:
+        c_date_month = st.number_input(
+            "月",
+            min_value=1,
+            max_value=12,
+            value=today.month,
+            step=1,
+            format="%d",
+            key="custom_event_month",
+        )
+      with c_date_day_col:
+        c_date_day = st.number_input(
+            "日",
+            min_value=1,
+            max_value=31,
+            value=today.day,
+            step=1,
+            format="%d",
+            key="custom_event_day",
+        )
+      st.caption(
+          format_roc_year(solar_year_from_roc_year(c_date_roc_year))
       )
-      st.caption(format_solar_date(c_date))
       c_time = st.time_input(
           "活動時間",
           value=datetime.time(9, 0),
@@ -880,21 +922,30 @@ if app_mode == "一、 萬年曆與個人提醒":
       submitted = st.form_submit_button("產生個人日曆提醒檔")
 
     if submitted:
+      st.session_state.pop("custom_event_ics", None)
       if not c_name.strip():
-        st.session_state.pop("custom_event_ics", None)
         st.error("請先輸入活動名稱，再產生日曆提醒檔。")
       else:
-        st.session_state.custom_event_ics = generate_ics(
-            f"【個人提醒】{c_name.strip()}",
-            c_date,
-            c_desc,
-            "https://longtiangong.github.io/homepage/",
-            event_time=c_time,
-            reminder_days=c_reminder_days,
-        )
-        st.success(
-            f"✅ 您的個人提醒（{format_solar_date(c_date)}）檔已產生！"
-        )
+        try:
+          c_date = date(
+              solar_year_from_roc_year(c_date_roc_year),
+              c_date_month,
+              c_date_day,
+          )
+        except ValueError:
+          st.error("活動日期無效，請確認民國年月日是否存在。")
+        else:
+          st.session_state.custom_event_ics = generate_ics(
+              f"【個人提醒】{c_name.strip()}",
+              c_date,
+              c_desc,
+              "https://longtiangong.github.io/homepage/",
+              event_time=c_time,
+              reminder_days=c_reminder_days,
+          )
+          st.success(
+              f"✅ 您的個人提醒（{format_solar_date(c_date)}）檔已產生！"
+          )
 
     if st.session_state.get("custom_event_ics"):
       st.download_button(
