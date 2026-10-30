@@ -399,7 +399,7 @@ if app_mode == "一、 萬年曆與個人提醒":
   tab1, tab2 = st.tabs(["🔍 日期與生辰反查", "⏰ 龍天宮行事曆與個人提醒設定"])
 
   with tab1:
-    st.subheader("1. 國曆 / 農曆 / 生辰時辰轉換")
+    st.subheader("1. 國曆 / 農曆 / 出生時辰轉換")
     today = date.today()
     if "selected_solar_date" not in st.session_state:
       st.session_state.selected_solar_date = today
@@ -694,7 +694,7 @@ if app_mode == "一、 萬年曆與個人提醒":
             unsafe_allow_html=True,
         )
 
-    has_birth_time = st.checkbox("是否加入生辰時辰換算？")
+    has_birth_time = st.checkbox("是否加入出生時辰換算？")
     birth_hour = 12
     if has_birth_time:
       birth_hour = st.number_input(
