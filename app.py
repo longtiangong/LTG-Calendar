@@ -1011,7 +1011,7 @@ elif app_mode == "二、 龍天宮法會及進香活動":
       ),
       (
           "九月北巡進香日",
-          "農曆九月初一日 (國曆10/1) 星期一",
+          "農曆八月十一一日 (國曆9/11) 星期六",
           "北巡進香日",
           "https://longtiangong.github.io/homepage/Jinxiang.html",
       ),
