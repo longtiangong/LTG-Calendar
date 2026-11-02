@@ -63,8 +63,8 @@ LONGTIAN_EVENTS = [
     },
     {
         "name": "九月北巡進香",
-        "lunar": "9月01日",
-        "solar": "2027-10-01",
+        "lunar": "8月11日",
+        "solar": "2027-09-11",
         "desc": "北巡進香日",
         "link": "https://longtiangong.github.io/homepage/Jinxiang.html",
     },
