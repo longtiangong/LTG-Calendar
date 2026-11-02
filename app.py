@@ -850,6 +850,18 @@ if app_mode == "一、 萬年曆與個人提醒":
         "每場活動固定於活動前 3 天及活動當日上午 9:30 提醒。"
         "匯入 Google 日曆後，請確認活動通知時間符合預期。"
     )
+    st.warning(
+        "手機的Google 日曆預設「不會」自動覆蓋已經匯入舊資料，"
+        "故建議利用電腦版建立及刪除"
+    )
+    st.markdown(
+        "[參考電腦版安裝龍天宮年度行事曆操作說明]"
+        "(https://drive.google.com/file/d/1XJQ8w7d79sdzRRzZArDS4J_FKjVKdi50/view?usp=drive_link)"
+    )
+    st.markdown(
+        "[參考電腦版移除龍天宮年度行事曆]"
+        "(https://drive.google.com/file/d/11Ww0INshBIFgjc4Tughdp17ds4k3aIK4/view?usp=drive_link)"
+    )
     annual_events_ics = generate_annual_events_ics(
         LONGTIAN_EVENTS, [3, 0]
     )
