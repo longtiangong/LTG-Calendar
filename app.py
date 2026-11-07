@@ -13,6 +13,27 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    button[data-testid="stExpandSidebarButton"] {
+      width: auto !important;
+      min-width: max-content !important;
+      padding: 0 0.4rem !important;
+    }
+    button[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
+      display: none !important;
+    }
+    button[data-testid="stExpandSidebarButton"]::after {
+      content: "請點開";
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # --- 龍天宮年度固定/丁未年(116年/2027)行事曆資料 ---
 LONGTIAN_EVENTS = [
     {
@@ -127,6 +148,32 @@ LUNAR_DAY_CN = [
 ]
 ROC_YEAR_OFFSET = 1911
 MAX_CALENDAR_YEAR = 2066
+SOLAR_TERMS = [
+    "冬至",
+    "小寒",
+    "大寒",
+    "立春",
+    "雨水",
+    "驚蟄",
+    "春分",
+    "清明",
+    "穀雨",
+    "立夏",
+    "小滿",
+    "芒種",
+    "夏至",
+    "小暑",
+    "大暑",
+    "立秋",
+    "處暑",
+    "白露",
+    "秋分",
+    "寒露",
+    "霜降",
+    "立冬",
+    "小雪",
+    "大雪",
+]
 
 
 def format_roc_year(solar_year):
@@ -145,6 +192,22 @@ def get_lunar_day_label(lunar_day):
   if not 1 <= lunar_day <= len(LUNAR_DAY_CN):
     raise ValueError(f"Unsupported lunar day: {lunar_day}")
   return LUNAR_DAY_CN[lunar_day - 1]
+
+
+def calculate_age(birth_date, current_date):
+  age = current_date.year - birth_date.year
+  if (current_date.month, current_date.day) < (
+      birth_date.month,
+      birth_date.day,
+  ):
+    age -= 1
+  return age
+
+
+def get_solar_term(day_obj):
+  if not day_obj.hasJieQi():
+    return None
+  return SOLAR_TERMS[day_obj.getJieQi()]
 
 
 def get_shichen(hour):
@@ -660,17 +723,24 @@ if app_mode == "一、 萬年曆與個人提醒":
             unsafe_allow_html=True,
         )
 
+      solar_terms_in_month = []
       for week in month_weeks:
         day_columns = st.columns(7)
         for column, day in zip(day_columns, week):
           if day == 0:
             continue
           solar_date = date(calendar_year, calendar_month, day)
-          lunar_day_label = get_lunar_day_label(
-              sxtwl.fromSolar(
-                  solar_date.year, solar_date.month, solar_date.day
-              ).getLunarDay()
+          calendar_day_obj = sxtwl.fromSolar(
+              solar_date.year, solar_date.month, solar_date.day
           )
+          lunar_day_label = get_lunar_day_label(
+              calendar_day_obj.getLunarDay()
+          )
+          solar_term = get_solar_term(calendar_day_obj)
+          if solar_term:
+            solar_terms_in_month.append(
+                f"{solar_date:%m月%d日} {solar_term}"
+            )
           calendar_event_labels = calendar_events_by_date.get(solar_date, [])
           with column:
             if st.button(
@@ -687,6 +757,13 @@ if app_mode == "一、 萬年曆與個人提醒":
                 f"{lunar_day_label}</div>",
                 unsafe_allow_html=True,
             )
+            if solar_term:
+              st.markdown(
+                  f"<div class='solar-term-label' style='text-align:center;"
+                  f"color:#16803c;font-size:0.65rem;line-height:1'>"
+                  f"{solar_term}</div>",
+                  unsafe_allow_html=True,
+              )
             #! 新增：在農曆日期下方以紅字顯示宮中活動
             for event_label in calendar_event_labels:
               st.markdown(
@@ -697,6 +774,8 @@ if app_mode == "一、 萬年曆與個人提醒":
                   unsafe_allow_html=True,
               )
             #! 新增結束
+
+    st.caption(f"本月節氣：{'、'.join(solar_terms_in_month)}")
 
     # 3 選到年度活動日期時，在月曆下方顯示醒目的活動跑馬燈
     selected_calendar_events = calendar_events_by_date.get(selected_date, [])
@@ -763,19 +842,28 @@ if app_mode == "一、 萬年曆與個人提醒":
       y_gz = f"{TIANGAN[year_gz.tg]}{DIZHI[year_gz.dz]}年"
       m_gz = f"{TIANGAN[month_gz.tg]}{DIZHI[month_gz.dz]}月"
       d_gz = f"{TIANGAN[day_gz.tg]}{DIZHI[day_gz.dz]}日"
+      solar_term = get_solar_term(day_obj)
+      if selected_date > today:
+        actual_age = virtual_age = "尚未出生"
+      else:
+        actual_age = f"{calculate_age(selected_date, today)} 歲"
+        current_lunar_year = sxtwl.fromSolar(
+            today.year, today.month, today.day
+        ).getLunarYear()
+        virtual_age = f"{current_lunar_year - lunar_year + 1} 歲"
 
       st.success("✨ 查詢結果對照：")
-      #! 新增：手機上讓日期換行並縮小字體，避免查詢結果被截斷
-      # 1 手機查詢結果：將三項結果放入專屬容器，套用手機版樣式
       with st.container(key="calendar_results"):
-        res_col1, res_col2, res_col3 = st.columns(3)
-        with res_col1:
-          st.metric("國曆日期", format_solar_date(selected_date))
-        with res_col2:
-          st.metric("農曆日期", lunar_str)
-        with res_col3:
-          st.metric("天干地支", f"{y_gz} {m_gz} {d_gz}")
-      #! 新增結束
+        st.metric("國曆日期", format_solar_date(selected_date))
+        st.metric("農曆日期", lunar_str)
+        st.metric("天干地支", f"{y_gz} {m_gz} {d_gz}")
+        st.metric("實歲", actual_age)
+        st.metric("虛歲", virtual_age)
+        st.metric("二十四節氣", solar_term or "非節氣日")
+      st.caption(
+          "年齡以所選日期作為生日；實歲依國曆生日計算，"
+          "虛歲以農曆年為界，出生當年算一歲。"
+      )
       #! 新增：提示手機可使用雙指縮放檢視內容
       # 1 提示使用者可用雙指縮放
       st.caption("手機請使用 A−／A+ 按鈕調整文字大小。")
