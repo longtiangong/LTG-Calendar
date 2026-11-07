@@ -26,6 +26,8 @@ st.markdown(
     }
     button[data-testid="stExpandSidebarButton"]::after {
       content: "請點開";
+      /* # * 改為紅字 */
+      color: #c00;
       font-size: 0.75rem;
       white-space: nowrap;
     }
