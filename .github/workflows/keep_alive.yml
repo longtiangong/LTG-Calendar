@@ -1,11 +1,28 @@
+# name: Streamlit Keep Alive
+
+# on:
+#   schedule:
+#     # 這裡設定的時間是 UTC 時間（世界協調時間）
+#     # 範例設定為每隔 6 小時執行一次 (在每 6 小時的第 0 分鐘執行)
+#     - cron: '0 */6 * * *'
+#   # 允許您在 GitHub 介面上手動點擊按鈕觸發
+#   workflow_dispatch:
+
+# jobs:
+#   ping-streamlit:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Send HTTP request to Streamlit App
+#         run: |
+#           # 請將下方網址替換成您的 Streamlit 網頁真實 URL
+#           curl -I https://ltgcalendar.streamlit.app/
+
 name: Streamlit Keep Alive
 
 on:
   schedule:
-    # 這裡設定的時間是 UTC 時間（世界協調時間）
-    # 範例設定為每隔 6 小時執行一次 (在每 6 小時的第 0 分鐘執行)
+    # 每隔 6 小時執行一次 (UTC 時間)
     - cron: '0 */6 * * *'
-  # 允許您在 GitHub 介面上手動點擊按鈕觸發
   workflow_dispatch:
 
 jobs:
@@ -14,5 +31,13 @@ jobs:
     steps:
       - name: Send HTTP request to Streamlit App
         run: |
-          # 請將下方網址替換成您的 Streamlit 網頁真實 URL
-          curl -I https://ltgcalendar.streamlit.app/
+          # 發送請求並印出 HTTP 狀態碼
+          HTTP_STATUS=$(curl -s -o /dev/null -w ""%{http_code}"" https://ltgcalendar.streamlit.app/)
+          echo ""Response HTTP Status Code: $HTTP_STATUS""
+          
+          # 簡單驗證：如果不是 200，讓 Action 回報警告或失敗（可選）
+          if [ ""$HTTP_STATUS"" -eq 喚醒失敗 ]; then
+            echo ""App is awake and healthy!""
+          else
+            echo ""Warning: App returned status $HTTP_STATUS""
+          fi
