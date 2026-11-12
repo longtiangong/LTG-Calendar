@@ -35,9 +35,9 @@ jobs:
           HTTP_STATUS=$(curl -s -o /dev/null -w ""%{http_code}"" https://ltgcalendar.streamlit.app/)
           echo ""Response HTTP Status Code: $HTTP_STATUS""
           
-          # 簡單驗證：如果不是 200，讓 Action 回報警告或失敗（可選）
-          if [ ""$HTTP_STATUS"" -eq 喚醒失敗 ]; then
-            echo ""App is awake and healthy!""
+          # 修改判斷邏輯，接受 200 或 303
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 303 ]; then
+            echo "App is awake and healthy!"
           else
-            echo ""Warning: App returned status $HTTP_STATUS""
+            echo "Warning: App returned status $HTTP_STATUS"
           fi
