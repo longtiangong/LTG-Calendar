@@ -1,5 +1,3 @@
-name: Streamlit Keep Alive
-
 on:
   schedule:
     # 每隔 6 小時執行一次 (UTC 時間)
