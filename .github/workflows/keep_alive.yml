@@ -2,23 +2,87 @@ name: Streamlit Keep Alive
 
 on:
   schedule:
-    # 每隔 6 小時執行一次 (UTC 時間)
-    - cron: '0 */6 * * *'
+    # Run every 15 minutes. GitHub can delay scheduled runs during high load.
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
   ping-streamlit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: streamlit-keep-alive
+      cancel-in-progress: true
     steps:
-      - name: Send HTTP request to Streamlit App
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
         run: |
-          # 發送請求並印出 HTTP 狀態碼
-          HTTP_STATUS=$(curl -s -o /dev/null -w ""%{http_code}"" https://ltgcalendar.streamlit.app/)
-          echo ""Response HTTP Status Code: $HTTP_STATUS""
-          
-          # 修改判斷邏輯，接受 200 或 303
-          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 303 ]; then
-            echo "App is awake and healthy!"
-          else
-            echo "Warning: App returned status $HTTP_STATUS"
-          fi
+          npm install playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Wake and verify Streamlit App
+        run: |
+          node <<'EOF'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+            const appUrl = 'https://ltgcalendar.streamlit.app/?embed=true';
+
+            try {
+              const response = await page.goto(appUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: 60_000,
+              });
+              const status = response ? response.status() : 0;
+              console.log(`Initial HTTP Status: ${status}`);
+
+              await page.waitForTimeout(5_000);
+
+              const wakeButton = page.getByRole('button', {
+                name: /yes, get this app back up!/i,
+              });
+
+              if (await wakeButton.isVisible().catch(() => false)) {
+                console.log('Sleeping app detected; clicking the wake button.');
+                await wakeButton.click();
+                await page.waitForTimeout(180_000);
+              } else {
+                console.log('App appears active.');
+                await page.waitForTimeout(30_000);
+              }
+
+              const currentUrl = page.url();
+              const bodyText = await page.locator('body').innerText().catch(() => '');
+
+              if (
+                /log in|authentication/i.test(bodyText) ||
+                /sleep|has gone to sleep/i.test(bodyText)
+              ) {
+                throw new Error(`App is not available. URL: ${currentUrl}`);
+              }
+
+              console.log(`Verified app page: ${currentUrl}`);
+            } finally {
+              await browser.close();
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          EOF
+
+
+
+
+
+
+
+    
