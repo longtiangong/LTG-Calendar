@@ -116,6 +116,21 @@ DIZHI = [
     "戌",
     "亥",
 ]
+# * 11191645 增加中國農曆生肖
+ZODIAC = [
+    "鼠",
+    "牛",
+    "虎",
+    "兔",
+    "龍",
+    "蛇",
+    "馬",
+    "羊",
+    "猴",
+    "雞",
+    "狗",
+    "豬",
+]
 LUNAR_DAY_CN = [
     "初一",
     "初二",
@@ -194,6 +209,12 @@ def get_lunar_day_label(lunar_day):
   if not 1 <= lunar_day <= len(LUNAR_DAY_CN):
     raise ValueError(f"Unsupported lunar day: {lunar_day}")
   return LUNAR_DAY_CN[lunar_day - 1]
+
+
+# * 11191645 增加中國農曆生肖
+def get_zodiac(lunar_year):
+  """依據農曆年份換算中國十二生肖"""
+  return ZODIAC[(lunar_year - 4) % 12]
 
 
 def calculate_age(birth_date, current_date):
@@ -782,7 +803,7 @@ if app_mode == "一、 萬年曆與個人提醒":
     # 3 選到年度活動日期時，在月曆下方顯示醒目的活動跑馬燈
     selected_calendar_events = calendar_events_by_date.get(selected_date, [])
     if selected_calendar_events:
-      ticker_text = "　 🏮　✦　 ".join(selected_calendar_events)
+      ticker_text = "  🏮 ✦  ".join(selected_calendar_events)
       with st.container(key="calendar_event_ticker"):
         st.markdown(
             f"<div class='event-marquee-track'>"
@@ -813,6 +834,8 @@ if app_mode == "一、 萬年曆與個人提醒":
       lunar_year = day_obj.getLunarYear()
       lunar_month = day_obj.getLunarMonth()
       lunar_day = day_obj.getLunarDay()
+      # * 11191645 增加中國農曆生肖
+      zodiac_str = get_zodiac(lunar_year)
 
       # 農曆月份字串處理（支援閏月）
       month_cn = [
@@ -835,7 +858,8 @@ if app_mode == "一、 萬年曆與個人提醒":
           else f"{month_cn[lunar_month-1]}月"
       )
       d_str = get_lunar_day_label(lunar_day)
-      lunar_str = f"農曆 {lunar_year}年 {m_str}{d_str}"
+      # * 11191645 增加中國農曆生肖
+      lunar_str = f"農曆 {lunar_year}年 (肖{zodiac_str}) {m_str}{d_str}"
 
       # 天干地支 (年月日干支)
       year_gz = get_ganzhi(day_obj, "year")
@@ -858,6 +882,8 @@ if app_mode == "一、 萬年曆與個人提醒":
       with st.container(key="calendar_results"):
         st.metric("國曆日期", format_solar_date(selected_date))
         st.metric("農曆日期", lunar_str)
+        # * 11191645 增加中國農曆生肖
+        st.metric("農曆生肖", f"屬{zodiac_str}")
         st.metric("天干地支", f"{y_gz} {m_gz} {d_gz}")
         st.metric("實歲", actual_age)
         st.metric("虛歲", virtual_age)
@@ -1074,6 +1100,7 @@ elif app_mode == "二、 龍天宮法會及進香活動":
   st.markdown("---")
 
   # 用卡片/表格條列展示所有活動
+
   events_data = [
       (
           "丙午年十二月祭改",
