@@ -217,6 +217,43 @@ def get_zodiac(lunar_year):
   return ZODIAC[(lunar_year - 4) % 12]
 
 
+def get_year_ganzhi_str(lunar_year):
+  """依據農曆年份計算歲次天干地支"""
+  tg = TIANGAN[(lunar_year - 4) % 10]
+  dz = DIZHI[(lunar_year - 4) % 12]
+  return f"{tg}{dz}"
+
+
+def find_years_by_ganzhi(tg, dz, reference_lunar_year, max_age=120):
+  """依據天干與地支反推近 120 年內符合的農曆出生年份與年齡"""
+  tg_idx = TIANGAN.index(tg)
+  dz_idx = DIZHI.index(dz)
+  # 六十甲子中，天干與地支的索引奇偶性必須一致
+  if tg_idx % 2 != dz_idx % 2:
+    return []
+
+  # 計算六十甲子序號 (0 = 甲子, ..., 59 = 癸亥)
+  cycle_index = (6 * tg_idx - 5 * dz_idx) % 60
+  matches = []
+  for lunar_year in range(reference_lunar_year, reference_lunar_year - max_age, -1):
+    if (lunar_year - 4) % 60 == cycle_index:
+      virtual_age = reference_lunar_year - lunar_year + 1
+      matches.append(
+          {
+              "lunar_year": lunar_year,
+              "roc_year": lunar_year - ROC_YEAR_OFFSET,
+              "zodiac": get_zodiac(lunar_year),
+              "virtual_age": virtual_age,
+              "actual_age_range": (
+                  f"{max(0, virtual_age - 2)} ~ {max(0, virtual_age - 1)} 歲"
+                  if virtual_age > 1
+                  else "0 ~ 1 歲"
+              ),
+          }
+      )
+  return matches
+
+
 def calculate_age(birth_date, current_date):
   age = current_date.year - birth_date.year
   if (current_date.month, current_date.day) < (
@@ -272,6 +309,15 @@ def escape_ics_text(value):
       .replace(",", "\\,")
       .replace(";", "\\;")
   )
+
+
+REMINDER_LABEL_MAP = {
+    30: "活動前一個月（30天）",
+    14: "活動前兩週（14天）",
+    7: "活動前一週（7天）",
+    3: "活動前 3 天",
+    0: "活動當日上午 9:30",
+}
 
 
 def generate_ics(
@@ -339,7 +385,9 @@ def generate_ics(
       )
     else:
       trigger = f"-P{days}D"
-    reminder_label = f"活動前 {days} 天" if days else "活動當日"
+    reminder_label = REMINDER_LABEL_MAP.get(
+        days, f"活動前 {days} 天" if days else "活動當日"
+    )
     event_lines.extend(
         [
             "BEGIN:VALARM",
@@ -467,7 +515,9 @@ def get_ganzhi(day_obj, target):
     if callable(legacy_getter):
       gz = legacy_getter()
     else:
-      raise AttributeError(f"{type(day_obj).__name__} object has no attribute '{getter_name}'")
+      raise AttributeError(
+          f"{type(day_obj).__name__} object has no attribute '{getter_name}'"
+      )
 
   if hasattr(gz, "gz"):
     return gz.gz
@@ -491,8 +541,8 @@ st.sidebar.info(
 if app_mode == "一、 萬年曆與個人提醒":
   st.title("📅 龍天宮萬年曆與時辰換算")
   st.write(
-    "查詢國曆/農曆對照、天干地支、生辰時辰，並可自訂活動與設定提醒（支援匯出至 Google"
-    " 日曆）。"
+      "查詢國曆/農曆對照、天干地支、生辰時辰，並可自訂活動與設定提醒（支援匯出至 Google"
+      " 日曆）。"
   )
 
   tab1, tab2 = st.tabs(["🔍 日期與生辰反查", "⏰ 龍天宮行事曆與個人提醒設定"])
@@ -619,7 +669,6 @@ if app_mode == "一、 萬年曆與個人提醒":
           font-size: {0.9 * calendar_text_zoom:.2f}rem;
           line-height: 1.6;
         }}
-        # * 5 跑馬燈文字垂直置中，避免貼近背景邊緣而被裁切
         /* # 5 跑馬燈文字垂直置中，避免貼近背景邊緣而被裁切 */
         .st-key-calendar_event_ticker [data-testid="stMarkdownContainer"] {{
           display: flex;
@@ -905,6 +954,53 @@ if app_mode == "一、 萬年曆與個人提醒":
     except Exception as e:
       st.error(f"日期計算發生錯誤：{e}")
 
+    # ==========================================
+    # 新增功能 1：輸入天干地支查詢年齡
+    # ==========================================
+    st.markdown("---")
+    st.subheader("2. 輸入天干地支查詢年齡")
+    st.write("選擇出生年歲次的天干與地支，系統將自動推算近 120 年內對應的出生年份、生肖與年齡。")
+
+    gz_col1, gz_col2 = st.columns(2)
+    with gz_col1:
+      selected_tg = st.selectbox("選擇天干", options=TIANGAN, key="ganzhi_tg")
+    with gz_col2:
+      selected_dz = st.selectbox("選擇地支", options=DIZHI, key="ganzhi_dz")
+
+    current_lunar_year = sxtwl.fromSolar(
+        today.year, today.month, today.day
+    ).getLunarYear()
+    current_year_gz = get_year_ganzhi_str(current_lunar_year)
+
+    matched_years = find_years_by_ganzhi(
+        selected_tg, selected_dz, current_lunar_year, max_age=120
+    )
+
+    if not matched_years:
+      st.warning(
+          f"⚠️ 「**{selected_tg}{selected_dz}年**」不屬於傳統六十甲子組合"
+          "（陽干配陽支、陰干配陰支），請重新選擇天干或地支。"
+      )
+    else:
+      st.success(
+          f"✨ 查詢歲次：**{selected_tg}{selected_dz}年**（肖{matched_years[0]['zodiac']}）"
+          f"｜目前農曆基準年為 **{current_year_gz}年（{format_roc_year(current_lunar_year)}）**"
+      )
+      for item in matched_years:
+        roc_label = (
+            f"民國{item['roc_year']}年"
+            if item["roc_year"] > 0
+            else f"民前{abs(item['roc_year']) + 1}年"
+        )
+        st.info(
+            f"📅 **{roc_label}（西元 {item['lunar_year']} 年）** — "
+            f"虛歲：**{item['virtual_age']} 歲** ｜ 實歲約：**{item['actual_age_range']}**"
+        )
+      st.caption(
+          "註：六十甲子每 60 年循環一次；虛歲依農曆年計算（出生當年算 1 歲），"
+          "實歲視當年度國曆生日是否已過而有 1 歲落差。"
+      )
+
   with tab2:
     st.subheader("2. 龍天宮行事曆與個人提醒設定")
     st.write(
@@ -918,11 +1014,28 @@ if app_mode == "一、 萬年曆與個人提醒":
     )
 
     st.markdown("### 🏮 龍天宮年度行事曆活動")
-    # *6 固定年度活動提醒為活動前 3 天及活動當日上午 9:30
-    st.caption(
-        "每場活動固定於活動前 3 天及活動當日上午 9:30 提醒。"
-        "匯入 Google 日曆後，請確認活動通知時間符合預期。"
+    # ==========================================
+    # 新增功能 2：可自選年度行事曆活動提醒時間
+    # ==========================================
+    annual_reminder_options = [30, 14, 7, 3, 0]
+    selected_annual_reminders = st.multiselect(
+        "選擇活動提醒時間（可複選，皆於該日上午 9:30 提醒）：",
+        options=annual_reminder_options,
+        default=[3, 0],
+        format_func=lambda days: REMINDER_LABEL_MAP[days],
+        key="annual_event_reminders",
     )
+    if selected_annual_reminders:
+      chosen_labels = "、".join(
+          REMINDER_LABEL_MAP[d] for d in selected_annual_reminders
+      )
+      st.caption(
+          f"目前設定每場活動於：**{chosen_labels}** 提醒。"
+          "匯入 Google 日曆後，請確認活動通知時間符合預期。"
+      )
+    else:
+      st.caption("目前未勾選任何提醒時間，產生的日曆檔將不包含通知提醒。")
+
     st.warning(
         "手機的Google 日曆預設「不會」自動覆蓋已經匯入舊資料，"
         "故建議利用電腦版建立及刪除，請參考下方操作說明。"
@@ -936,7 +1049,7 @@ if app_mode == "一、 萬年曆與個人提醒":
         "(https://drive.google.com/file/d/11Ww0INshBIFgjc4Tughdp17ds4k3aIK4/view?usp=drive_link)"
     )
     annual_events_ics = generate_annual_events_ics(
-        LONGTIAN_EVENTS, [3, 0]
+        LONGTIAN_EVENTS, selected_annual_reminders
     )
     st.download_button(
         label="📥 下載龍天宮丁未年民國116年(2027年)年度行事曆活動 (.ics)",
@@ -1083,6 +1196,8 @@ if app_mode == "一、 萬年曆與個人提醒":
           mime="text/calendar",
           key="download_custom_reminder",
       )
+
+
 
 
 # ==========================================
